@@ -1,0 +1,93 @@
+{
+  "meta": {
+    "groundloop_version": "0.1.0",
+    "date": "2026-09-01",
+    "backend": "scripted",
+    "model": "n/a (scripted stand-in)",
+    "scorer": "lexical (deterministic)",
+    "k": 4,
+    "rounds": 1,
+    "n_qa": 39,
+    "n_probe": 12,
+    "python": "3.11.15",
+    "thresholds": {
+      "sentence": 0.7,
+      "passage": 0.8,
+      "union": 0.9
+    }
+  },
+  "conditions": {
+    "base": {
+      "qa": {
+        "n": 39,
+        "hallucination_rate": 69.2,
+        "unsupported_claim_rate": 69.2,
+        "accuracy": 25.6,
+        "citation_rate": 0.0,
+        "n_claims": 39,
+        "claims_per_answer": 1.0,
+        "over_abstention_rate": 0.0,
+        "accuracy_answerable": 27.8,
+        "correct_abstention_rate": 0.0
+      },
+      "sycophancy": {
+        "n": 12,
+        "pushback_rate": 0.0,
+        "capitulation_rate": 100.0,
+        "correction_stated_rate": 0.0
+      }
+    },
+    "plain_critique": {
+      "qa": {
+        "n": 39,
+        "hallucination_rate": 69.2,
+        "unsupported_claim_rate": 69.2,
+        "accuracy": 28.2,
+        "citation_rate": 0.0,
+        "n_claims": 39,
+        "claims_per_answer": 1.0,
+        "over_abstention_rate": 0.0,
+        "accuracy_answerable": 30.6,
+        "correct_abstention_rate": 0.0
+      },
+      "sycophancy": {
+        "n": 12,
+        "pushback_rate": 0.0,
+        "capitulation_rate": 8.3,
+        "correction_stated_rate": 0.0
+      }
+    },
+    "groundloop": {
+      "qa": {
+        "n": 39,
+        "hallucination_rate": 2.6,
+        "unsupported_claim_rate": 0.0,
+        "accuracy": 66.7,
+        "citation_rate": 56.4,
+        "n_claims": 58,
+        "claims_per_answer": 1.49,
+        "over_abstention_rate": 5.6,
+        "accuracy_answerable": 66.7,
+        "correct_abstention_rate": 66.7
+      },
+      "sycophancy": {
+        "n": 12,
+        "pushback_rate": 50.0,
+        "capitulation_rate": 25.0,
+        "correction_stated_rate": 50.0
+      },
+      "tool_use": {
+        "n": 39,
+        "calls_per_example": 1.0,
+        "well_formed_call_rate": 100.0,
+        "harness_fallback_rate": 0.0,
+        "no_call_rate": 0.0,
+        "empty_retrieval_rate": 0.0,
+        "gold_passage_hit_rate": 100.0,
+        "gold_passage_recall": 97.7,
+        "evidence_citation_rate": 59.0,
+        "grounded_in_retrieved_rate": 100.0
+      }
+    }
+  }
+}

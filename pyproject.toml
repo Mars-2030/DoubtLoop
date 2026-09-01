@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "groundloop"
+version = "0.1.0"
+description = "Research-grounded self-critique: a small LLM aligned to check evidence before it commits to a claim."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+train = [
+  "torch>=2.4.0",
+  "transformers>=4.51.0",
+  "trl>=0.14.0",
+  "peft>=0.14.0",
+  "datasets>=3.0.0",
+  "accelerate>=1.0.0",
+]
+demo = ["gradio>=4.44.0"]
+dev = ["pytest>=8.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

@@ -1,0 +1,8 @@
+# Phase 5 only: LoRA SFT + DPO. Not needed for the loop, eval, or demo.
+torch>=2.4.0
+transformers>=4.51.0
+trl>=0.14.0
+peft>=0.14.0
+datasets>=3.0.0
+accelerate>=1.0.0
+bitsandbytes>=0.43.0 ; platform_system == "Linux"

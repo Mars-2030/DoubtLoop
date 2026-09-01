@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+# training + run outputs (regenerate with `make`)
+outputs/
+runs/
+checkpoints/
+wandb/
+data/generated/
+results/*.jsonl
+results/raw/

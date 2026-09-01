@@ -1,0 +1,7 @@
+# Core GroundLoop (loop, retrieval, eval, demo) runs on the Python standard
+# library only. Nothing here is needed to run `make smoke` or the test suite.
+#
+# Optional extras:
+#   pip install -r requirements-train.txt   # SFT + DPO fine-tuning
+#   pip install gradio                      # web demo (demo/app.py)
+#   pip install pytest                      # test suite
