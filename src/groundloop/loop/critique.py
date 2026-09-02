@@ -79,18 +79,25 @@ def critique(
     evidence: list[Passage] | None = None,
     query: str = "",
     evidence_block: str = "",
+    grounded: bool = False,
     max_new_tokens: int = 512,
 ) -> Critique:
-    """Run the critique stage. Pass `evidence=None` for the plain-CAI control."""
+    """Run the critique stage. `grounded=False` is the plain-CAI control.
+
+    Note that `grounded=True` with empty `evidence` is a real and important
+    state - the search ran and found nothing - and it must stay on the grounded
+    path so the correct critique is "this draft should abstain".
+    """
     raw = llm.generate(
-        prompts.critique_messages(question, draft, evidence_block, query),
+        prompts.critique_messages(question, draft, evidence_block, query, grounded=grounded),
         stage="critique",
-        ctx={"question": question, "draft": draft, "evidence": evidence or [], "query": query},
+        ctx={"question": question, "draft": draft, "evidence": evidence or [],
+             "query": query, "grounded": grounded},
         max_new_tokens=max_new_tokens,
     )
     parsed = parse_critique(raw)
-    if evidence:
-        parsed = annotate_with_evidence(parsed, draft, evidence)
+    if grounded:
+        parsed = annotate_with_evidence(parsed, draft, evidence or [])
     return parsed
 
 

@@ -106,6 +106,25 @@ not a training set.
     gold-passage recall, citation rate, grounding against what was actually
     retrieved.
 
+### Phase 6b — Robustness (was "next", now done)
+
+- **done** — `eval/retrieval_stress.py`: gold removed, irrelevant padding, and
+  empty results, applied *after* the model issues its query. The number that
+  matters is faithful abstention when the evidence cannot support an answer.
+  This found a design bug: on empty retrieval the loop took the no-evidence
+  critique path, so the GroundLoop condition silently became the control
+  condition on exactly the questions where the corpus was silent. The condition
+  now selects the policy; that row went from 0% abstention / 66.7% fabrication
+  to 100% / 0%.
+- **done** — `eval/sensitivity.py`: the `tau` sweep (same generations,
+  re-scored) and the `k` sweep (re-run). This found a metric bug: the
+  contradiction veto lived inside the sentence tier as an early return, so
+  raising `tau` let claims fall through to a more permissive tier and the
+  hallucination rate *fell* as the metric got stricter. Non-monotone sweeps
+  invalidate themselves; there is now a property test pinning it.
+- **done** — CI runs the tests on 3.10-3.12 and then runs the whole pipeline,
+  failing if the committed tables have drifted from what the code produces.
+
 ## Phase 7 — Package · **done**
 
 17. **done** — README leads with the three-way table (labelled with its
@@ -147,16 +166,26 @@ Physics and Chemistry). `--judge` swaps in an LLM over the same interface.
 ## Next, in order of what would change a conclusion
 
 1. **Run Phase 5 on real weights** and re-run `make eval-model` before and after.
-   Until then the headline table demonstrates a harness, not a method.
-2. **Report both scorers.** If the three-way ordering only holds under the
-   lexical check, that is a finding about the metric.
-3. **Adversarial retrieval.** Gold-passage hit rate here is ~97%, which isolates
-   the variable under test and says nothing about behaviour when retrieval is
-   wrong. Distractor passages, and passages that contradict each other, are the
-   sharper test of P4.
+   Until then the headline table demonstrates a harness, not a method. This is
+   the only item on this list that the current environment cannot do.
+2. **Report both scorers.** `--judge` exists but has never been run against a
+   real judge model. If the three-way ordering only holds under the lexical
+   check, that is a finding about the metric, and it should be in the README
+   rather than in this file.
+3. **Conflicting evidence.** `make stress` now covers retrieval that is missing,
+   empty, or padded with noise. It does not cover retrieval that is confidently
+   *wrong*: two passages that disagree, or one that states a plausible
+   falsehood. That is the sharpest test of P4 and it needs two things this repo
+   does not have — a conflicting corpus slice, and a constitution principle
+   about what to do when sources disagree (report the conflict; do not silently
+   pick). Adding the slice without adding the principle would just measure
+   which passage BM25 ranked first.
 4. **Scale the eval set** past the point where one item moves a percentage point.
+   At n = 39 the difference between 2.6% and 5.1% is one example.
 5. **Iterated rounds.** `--rounds` exists; whether a second critique pass helps
    or just adds hedging is unmeasured.
 6. **The over-abstention trade.** GroundLoop's abstention gain has to be weighed
-   against answerable questions it declines. Both numbers are in the table; the
-   right operating point is not yet chosen.
+   against answerable questions it declines. The `k` sweep is the sharpest view
+   of this: k=1 gives perfect abstention on unanswerable items and declines
+   14% of answerable ones. The right operating point is a choice about which
+   error is cheaper, and it has not been made.

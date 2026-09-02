@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      # The loop, the retriever and the eval suite are standard library only,
+      # so the test job installs a test runner and nothing else. If this step
+      # ever needs more, that is a signal worth noticing.
+      - run: pip install pytest
+      - run: make test
+
+  pipeline:
+    # The evaluation is the deliverable, so CI runs it rather than trusting that
+    # it still works. Regenerating the tables also catches the case where the
+    # committed results have drifted from what the code produces.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: three-way ablation
+        run: make eval
+      - name: retrieval stress
+        run: make stress
+      - name: threshold and k sensitivity
+        run: make sensitivity
+      - name: training data generation and dry-run training
+        run: |
+          make data
+          PYTHONPATH=src python3 -m groundloop.train.sft --dry-run
+          PYTHONPATH=src python3 -m groundloop.train.dpo --dry-run
+      - name: committed results match what the code produces
+        run: make check-results

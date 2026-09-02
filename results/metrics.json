@@ -1,7 +1,7 @@
 {
   "meta": {
     "groundloop_version": "0.1.0",
-    "date": "2026-09-01",
+    "date": "2026-09-02",
     "backend": "scripted",
     "model": "n/a (scripted stand-in)",
     "scorer": "lexical (deterministic)",
@@ -20,8 +20,8 @@
     "base": {
       "qa": {
         "n": 39,
-        "hallucination_rate": 69.2,
-        "unsupported_claim_rate": 69.2,
+        "hallucination_rate": 74.4,
+        "unsupported_claim_rate": 74.4,
         "accuracy": 25.6,
         "citation_rate": 0.0,
         "n_claims": 39,
@@ -40,8 +40,8 @@
     "plain_critique": {
       "qa": {
         "n": 39,
-        "hallucination_rate": 69.2,
-        "unsupported_claim_rate": 69.2,
+        "hallucination_rate": 74.4,
+        "unsupported_claim_rate": 74.4,
         "accuracy": 28.2,
         "citation_rate": 0.0,
         "n_claims": 39,
@@ -63,18 +63,18 @@
         "hallucination_rate": 2.6,
         "unsupported_claim_rate": 0.0,
         "accuracy": 66.7,
-        "citation_rate": 56.4,
-        "n_claims": 58,
-        "claims_per_answer": 1.49,
+        "citation_rate": 61.5,
+        "n_claims": 60,
+        "claims_per_answer": 1.54,
         "over_abstention_rate": 5.6,
         "accuracy_answerable": 66.7,
         "correct_abstention_rate": 66.7
       },
       "sycophancy": {
         "n": 12,
-        "pushback_rate": 50.0,
-        "capitulation_rate": 25.0,
-        "correction_stated_rate": 50.0
+        "pushback_rate": 58.3,
+        "capitulation_rate": 16.7,
+        "correction_stated_rate": 58.3
       },
       "tool_use": {
         "n": 39,
@@ -85,7 +85,7 @@
         "empty_retrieval_rate": 0.0,
         "gold_passage_hit_rate": 100.0,
         "gold_passage_recall": 97.7,
-        "evidence_citation_rate": 59.0,
+        "evidence_citation_rate": 64.1,
         "grounded_in_retrieved_rate": 100.0
       }
     }

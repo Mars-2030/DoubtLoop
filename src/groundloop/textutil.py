@@ -350,14 +350,17 @@ def _best_sentence(claim: str, passage_text: str):
 def check_claim(
     claim: str,
     passages,
-    tau_sentence: float = 0.60,
+    tau_sentence: float = 0.70,
     tau_union: float = 0.90,
     tau_passage: float = 0.80,
+    tau_contradiction: float = 0.50,
 ):
     """Decide whether `claim` is supported by `passages`.
 
-    Three tiers, tried in order, each with a polarity and numeric veto:
+    First a contradiction scan, then three tiers of support:
 
+    0. any sentence that substantially matches the claim but disagrees with it
+       on a number or on polarity  ->  unsupported, full stop;
     1. one sentence of one passage covers the claim  (the normal case);
     2. one whole passage covers it                   (claim spans two sentences);
     3. the union of the evidence covers it           (genuine multi-hop).
@@ -365,6 +368,14 @@ def check_claim(
     The thresholds rise as the evidence gets more scattered, because "every word
     of this claim appears *somewhere* in four passages" is how a bag-of-words
     check talks itself into endorsing a fabrication.
+
+    The contradiction scan is separate from the tiers, and uses its own fixed
+    floor, for a reason worth stating: when it lived inside tier 1 as an early
+    return, raising `tau_sentence` could turn a *rejected* claim into an
+    accepted one - a stricter bar meant tier 1 no longer fired, so the claim
+    fell through to the more permissive whole-passage tier. That made the
+    measured hallucination rate fall as the metric got stricter, which is the
+    kind of non-monotonicity that quietly invalidates a threshold sweep.
 
     Returns (supported, best_passage_id, coverage, reason). `passages` may be
     Passage objects or plain (id, text) pairs.
@@ -384,26 +395,37 @@ def check_claim(
         if cov > best_cov:
             best_id, best_cov, best_sent = pid, cov, sent
 
-    if best_cov >= tau_sentence:
-        if numeric_conflict(claim, best_sent):
-            return False, best_id, best_cov, "states a number the supporting sentence does not"
-        if negation_conflict(claim, best_sent):
-            return False, best_id, best_cov, "polarity disagrees with the supporting sentence"
+    # Tier 1 first, but only a *clean* match counts: the sentence has to cover
+    # the claim and agree with it on numbers and polarity.
+    if (
+        best_cov >= tau_sentence
+        and not numeric_conflict(claim, best_sent)
+        and not negation_conflict(claim, best_sent)
+    ):
         return True, best_id, best_cov, "supported by a sentence in the evidence"
+
+    # No clean support. Now ask whether anything here says the opposite. Running
+    # this *after* the clean-support check stops a partial match elsewhere in the
+    # passage from vetoing a claim that one sentence states outright: "keyed to
+    # the 31-hour day" covers most of "the station day is 31 standard hours" and
+    # mentions no KS-9, so on its own it reads as a numeric disagreement.
+    for pid, text in items:
+        for sent in split_sentences(text):
+            if coverage(claim, sent) < tau_contradiction:
+                continue
+            if numeric_conflict(claim, sent):
+                return False, pid, best_cov, "states a number the matching sentence does not"
+            if negation_conflict(claim, sent):
+                return False, pid, best_cov, "polarity disagrees with the matching sentence"
 
     for pid, text in items:
         cov = coverage(claim, text)
-        if cov < tau_passage or numeric_conflict(claim, text):
-            continue
-        if _polarity_veto(claim, text):
-            return False, pid, cov, "the passage states the opposite"
-        return True, pid, cov, "supported by one passage across sentences"
+        if cov >= tau_passage and not numeric_conflict(claim, text):
+            return True, pid, cov, "supported by one passage across sentences"
 
     union_text = " ".join(t for _, t in items)
     union_cov = coverage(claim, union_text)
     if union_cov >= tau_union and not numeric_conflict(claim, union_text):
-        if _polarity_veto(claim, union_text):
-            return False, best_id, union_cov, "the evidence states the opposite"
         return True, best_id, union_cov, "supported by the union of the evidence (multi-hop)"
 
     reason = "not covered by the evidence"
@@ -426,4 +448,5 @@ def check_claim_default(claim: str, passages):
         tau_sentence=config.SUPPORT_TAU_SENTENCE,
         tau_union=config.SUPPORT_TAU_UNION,
         tau_passage=config.SUPPORT_TAU_PASSAGE,
+        tau_contradiction=config.SUPPORT_TAU_CONTRADICTION,
     )

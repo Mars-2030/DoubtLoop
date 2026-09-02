@@ -479,9 +479,9 @@ class ScriptedBackend(LLM):
         if stage == "claims":
             return "\n".join(extract_claims(ctx.get("draft", "")))
         if stage == "critique":
-            return self._critique_grounded(ctx) if ctx.get("evidence") else self._critique_plain(ctx)
+            return self._critique_grounded(ctx) if ctx.get("grounded") else self._critique_plain(ctx)
         if stage == "revise":
-            return self._revise_grounded(ctx) if ctx.get("evidence") else self._revise_plain(ctx)
+            return self._revise_grounded(ctx) if ctx.get("grounded") else self._revise_plain(ctx)
         if stage == "judge":
             return "SUPPORTED"
         return self._draft(ctx)

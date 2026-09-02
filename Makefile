@@ -2,7 +2,7 @@ PYTHON ?= python3
 export PYTHONPATH := src
 
 .DEFAULT_GOAL := help
-.PHONY: help test smoke eval eval-model demo data sft dpo search clean
+.PHONY: help test smoke eval eval-model stress sensitivity results check-results demo data sft dpo search clean
 
 help:  ## show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -18,6 +18,18 @@ eval:  ## regenerate results/comparison_table.md with the scripted stand-in
 
 eval-model:  ## same, against a served model: make eval-model MODEL=Qwen/Qwen3.5-0.8B-Instruct
 	$(PYTHON) -m groundloop.eval.run_all --backend openai --model $(MODEL)
+
+stress:  ## how the loop behaves when retrieval is missing, empty, or noisy
+	$(PYTHON) -m groundloop.eval.retrieval_stress
+
+sensitivity:  ## does the result survive the threshold and k sweeps?
+	$(PYTHON) -m groundloop.eval.sensitivity
+
+results: eval stress sensitivity  ## regenerate every table and transcript in results/
+	$(PYTHON) scripts/make_transcripts.py
+
+check-results:  ## fail if committed results/ differs from a fresh run
+	$(PYTHON) scripts/check_results_drift.py
 
 demo:  ## launch the Gradio demo (pip install gradio)
 	$(PYTHON) demo/app.py

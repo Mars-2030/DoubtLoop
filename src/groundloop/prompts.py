@@ -183,8 +183,17 @@ def claims_messages(question: str, draft: str) -> list[dict]:
     ]
 
 
-def critique_messages(question: str, draft: str, evidence: str = "", query: str = "") -> list[dict]:
-    if evidence:
+def critique_messages(question: str, draft: str, evidence: str = "", query: str = "",
+                      grounded: bool | None = None) -> list[dict]:
+    """`grounded` selects the template. It defaults to "did we get evidence?"
+    for convenience, but the pipeline always passes it explicitly: an empty
+    retrieval must still take the grounded path, or the GroundLoop condition
+    quietly becomes the control condition on exactly the questions where the
+    corpus had nothing to say.
+    """
+    if grounded is None:
+        grounded = bool(evidence)
+    if grounded:
         content = CRITIQUE_GROUNDED_USER.format(
             constitution=constitution(), question=question, draft=draft,
             evidence=evidence, query=query,
@@ -199,8 +208,11 @@ def critique_messages(question: str, draft: str, evidence: str = "", query: str 
     ]
 
 
-def revise_messages(question: str, draft: str, critique: str, evidence: str = "") -> list[dict]:
-    if evidence:
+def revise_messages(question: str, draft: str, critique: str, evidence: str = "",
+                    grounded: bool | None = None) -> list[dict]:
+    if grounded is None:
+        grounded = bool(evidence)
+    if grounded:
         content = REVISE_GROUNDED_USER.format(
             question=question, draft=draft, critique=critique, evidence=evidence
         )

@@ -14,16 +14,18 @@ def revise(
     critique_text: str,
     evidence: list[Passage] | None = None,
     evidence_block: str = "",
+    grounded: bool = False,
     max_new_tokens: int = 384,
 ) -> str:
     text = llm.generate(
-        prompts.revise_messages(question, draft, critique_text, evidence_block),
+        prompts.revise_messages(question, draft, critique_text, evidence_block, grounded=grounded),
         stage="revise",
         ctx={
             "question": question,
             "draft": draft,
             "critique_text": critique_text,
             "evidence": evidence or [],
+            "grounded": grounded,
         },
         max_new_tokens=max_new_tokens,
     )

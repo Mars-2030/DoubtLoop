@@ -105,12 +105,13 @@ def run_condition(
         traj.meta["elapsed_s"] = round(time.time() - started, 3)
         return traj
 
+    grounded = condition == "groundloop"
     current = traj.draft
     for _ in range(max(1, rounds)):
         evidence: list[Passage] = []
         evidence_block = ""
         query = ""
-        if condition == "groundloop":
+        if grounded:
             if tool is None:
                 tool = SearchTool()
             calls, evidence, query = _research(llm, tool, question, current, k)
@@ -120,7 +121,7 @@ def run_condition(
 
         crit = critique_mod.critique(
             llm, question, current,
-            evidence=evidence or None, query=query, evidence_block=evidence_block,
+            evidence=evidence, query=query, evidence_block=evidence_block, grounded=grounded,
         )
         traj.critique = crit
         if crit.verdict == "ok" and not crit.unsupported:
@@ -128,7 +129,7 @@ def run_condition(
             break
         current = revise_stage(
             llm, question, current, critique_mod.render(crit),
-            evidence=evidence or None, evidence_block=evidence_block,
+            evidence=evidence, evidence_block=evidence_block, grounded=grounded,
         )
         traj.revision = current
 

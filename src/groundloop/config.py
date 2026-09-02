@@ -36,6 +36,12 @@ SUPPORT_TAU_SENTENCE = 0.70
 # ...or one whole PASSAGE does (a claim that legitimately spans two sentences)...
 SUPPORT_TAU_PASSAGE = 0.80
 # ...or the UNION of all retrieved evidence does (genuine multi-hop).
+# Separately, a sentence that covers at least SUPPORT_TAU_CONTRADICTION of the
+# claim but disagrees with it on a number or on polarity rejects it outright.
+# That floor is deliberately independent of the tiers above: fold it into the
+# sentence tier and raising SUPPORT_TAU_SENTENCE starts *accepting* claims it
+# used to reject, because they fall through to a more permissive tier.
+SUPPORT_TAU_CONTRADICTION = 0.50
 # The thresholds rise as the evidence gets more scattered: "every word of this
 # claim appears somewhere in four passages" is how a bag-of-words check talks
 # itself into endorsing a fabrication.
