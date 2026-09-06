@@ -43,6 +43,10 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--seed", type=int, default=config.SEED)
     ap.add_argument("--bf16", action="store_true", default=True)
     ap.add_argument("--no-bf16", dest="bf16", action="store_false")
+    # Turing cards (Colab's T4) have no bfloat16 support worth using; without
+    # this the run silently falls back to fp32 and takes several times longer.
+    ap.add_argument("--fp16", action="store_true",
+                    help="use float16 instead of bfloat16 (required on a T4)")
     ap.add_argument("--dry-run", action="store_true")
     return ap
 
@@ -71,6 +75,7 @@ def describe(args, n_records: int) -> str:
             "model": args.model,
             "init_adapter": args.adapter,
             "pairs": n_records,
+            "precision": "fp16" if args.fp16 else ("bf16" if args.bf16 else "fp32"),
             "beta": args.beta,
             "loss_type": args.loss_type,
             "epochs": args.epochs,
@@ -117,7 +122,8 @@ def main(argv: list[str] | None = None) -> int:
         loss_type=args.loss_type,
         max_length=args.max_length,
         max_prompt_length=args.max_prompt_length,
-        bf16=args.bf16,
+        bf16=args.bf16 and not args.fp16,
+        fp16=args.fp16,
         logging_steps=5,
         save_strategy="epoch",
         seed=args.seed,

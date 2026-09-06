@@ -43,6 +43,10 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--eval-split", type=float, default=0.1)
     ap.add_argument("--bf16", action="store_true", default=True)
     ap.add_argument("--no-bf16", dest="bf16", action="store_false")
+    # Turing cards (Colab's T4) have no bfloat16 support worth using; without
+    # this the run silently falls back to fp32 and takes several times longer.
+    ap.add_argument("--fp16", action="store_true",
+                    help="use float16 instead of bfloat16 (required on a T4)")
     ap.add_argument("--dry-run", action="store_true", help="validate data and config, train nothing")
     return ap
 
@@ -72,6 +76,7 @@ def describe(args, n_records: int) -> str:
             "epochs": args.epochs,
             "effective_batch": args.batch_size * args.grad_accum,
             "lr": args.lr,
+            "precision": "fp16" if args.fp16 else ("bf16" if args.bf16 else "fp32"),
             "lora": {"r": args.lora_r, "alpha": args.lora_alpha, "targets": args.lora_targets.split(",")},
             "output_dir": args.output_dir,
         },
@@ -117,7 +122,8 @@ def main(argv: list[str] | None = None) -> int:
         gradient_accumulation_steps=args.grad_accum,
         learning_rate=args.lr,
         max_length=args.max_seq_len,
-        bf16=args.bf16,
+        bf16=args.bf16 and not args.fp16,
+        fp16=args.fp16,
         logging_steps=5,
         save_strategy="epoch",
         eval_strategy="epoch" if eval_ds is not None else "no",

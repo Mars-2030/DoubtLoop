@@ -145,7 +145,21 @@ make results  # every table and transcript: ablation, stress, sensitivity
 make search Q="station day"      # query the evidence corpus directly
 ```
 
-Against a real model, serve it and point the backend at it:
+### On Colab (a free T4 is enough)
+
+[**Open the notebook**](https://colab.research.google.com/github/Mars-2030/DoubtLoop/blob/claude/groundloop-retrieval-critique-gebq3b/notebooks/groundloop_colab.ipynb)
+— [`notebooks/groundloop_colab.ipynb`](notebooks/groundloop_colab.ipynb) runs the
+whole thing against real weights: the ablation before fine-tuning, LoRA SFT, DPO,
+then the ablation again with the adapter. Roughly 1.5–2 hours end to end, most of
+it generation. It sets `--fp16` and `--dtype float16` automatically on a T4, which
+has no usable bfloat16.
+
+Run the `--limit 8` cell first. The pipeline has only ever been validated against
+the scripted stand-in, so the likeliest failure on first contact with a real model
+is format handling — chat template, tool-call shape, whether the critique comes
+back as JSON — and you want to find that out in five minutes rather than thirty.
+
+### Locally, against a served model
 
 ```bash
 pip install vllm
@@ -299,6 +313,7 @@ src/groundloop/
   train/                     LoRA SFT, then DPO/ORPO
   eval/                      metrics, stress, sensitivity, run_all
 demo/app.py                  Gradio, or --cli; runs with no training
+notebooks/                   Colab notebook: real weights, SFT, DPO, before/after
 scripts/make_transcripts.py  regenerates results/transcripts.md
 tests/                       110 tests
 .github/workflows/ci.yml     tests on 3.10-3.12; runs the full pipeline and

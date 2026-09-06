@@ -178,9 +178,17 @@ class TransformersBackend(LLM):
         self.torch = torch
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_id, torch_dtype=dtype, device_map=self.device
-        )
+        # "auto" reads the dtype out of the checkpoint config, which on a Turing
+        # GPU (Colab's T4) can hand you bfloat16 - supported, but emulated and
+        # slow. Pass --dtype float16 there.
+        try:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_id, dtype=dtype, device_map=self.device
+            )
+        except TypeError:  # transformers < 4.56 spells it torch_dtype
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_id, torch_dtype=dtype, device_map=self.device
+            )
         if adapter:
             from peft import PeftModel
 
@@ -516,6 +524,9 @@ def add_backend_args(parser) -> None:
     parser.add_argument("--adapter", default=None, help="LoRA adapter path (transformers backend)")
     parser.add_argument("--thinking", action="store_true",
                         help="enable Qwen thinking mode (transformers backend)")
+    parser.add_argument("--dtype", default="auto",
+                        choices=("auto", "float16", "bfloat16", "float32"),
+                        help="weight dtype (transformers backend). Use float16 on a T4.")
 
 
 def backend_from_args(args) -> LLM:
@@ -531,4 +542,5 @@ def backend_from_args(args) -> LLM:
         if getattr(args, "adapter", None):
             kwargs["adapter"] = args.adapter
         kwargs["thinking"] = bool(getattr(args, "thinking", False))
+        kwargs["dtype"] = getattr(args, "dtype", "auto")
     return get_backend(args.backend, **kwargs)
