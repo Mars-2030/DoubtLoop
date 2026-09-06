@@ -138,7 +138,10 @@ Nothing to install. The loop, the retriever, the evaluation, and the demo are
 standard-library Python.
 
 ```bash
-make test     # 110 tests, no GPU, no network, ~1s
+pip install -e .   # only needed to run `python -m groundloop...` directly;
+                   # the `make` targets set PYTHONPATH themselves
+
+make test     # 117 tests, no GPU, no network, ~1s
 make smoke    # one question through all three conditions
 make eval     # regenerate results/comparison_table.md
 make results  # every table and transcript: ablation, stress, sensitivity
@@ -315,7 +318,7 @@ src/groundloop/
 demo/app.py                  Gradio, or --cli; runs with no training
 notebooks/                   Colab notebook: real weights, SFT, DPO, before/after
 scripts/make_transcripts.py  regenerates results/transcripts.md
-tests/                       110 tests
+tests/                       117 tests
 .github/workflows/ci.yml     tests on 3.10-3.12; runs the full pipeline and
                              fails if the committed results have drifted
 ```
