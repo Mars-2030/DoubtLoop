@@ -99,7 +99,9 @@ class TestTrainingEntryPoints:
     def test_sft_dry_run(self, tmp_path, capsys):
         path = tmp_path / "sft.jsonl"
         path.write_text(json.dumps({"messages": [{"role": "user", "content": "hi"}]}) + "\n")
-        assert sft_mod.main(["--data", str(path), "--dry-run"]) == 0
+        # --allow-tiny-dataset because this checks argument handling, not the
+        # size guard; one record would otherwise (correctly) be refused.
+        assert sft_mod.main(["--data", str(path), "--dry-run", "--allow-tiny-dataset"]) == 0
         assert '"stage": "sft"' in capsys.readouterr().out
 
     def test_dpo_dry_run(self, tmp_path, capsys):
@@ -109,7 +111,7 @@ class TestTrainingEntryPoints:
             "chosen": [{"role": "assistant", "content": "good"}],
             "rejected": [{"role": "assistant", "content": "bad"}],
         }) + "\n")
-        assert dpo_mod.main(["--data", str(path), "--dry-run"]) == 0
+        assert dpo_mod.main(["--data", str(path), "--dry-run", "--allow-tiny-dataset"]) == 0
         assert '"stage": "dpo"' in capsys.readouterr().out
 
     def test_sft_rejects_records_without_messages(self, tmp_path):
@@ -129,3 +131,69 @@ class TestTrainingEntryPoints:
         path.write_text("")
         with pytest.raises(ValueError):
             sft_mod.load_records(path)
+
+
+class TestNoOpTrainingGuard:
+    """A fine-tune that takes three gradient steps looks like a successful run
+    in the logs, produces an adapter, and makes the before/after report that the
+    method did nothing. It has to fail loudly instead."""
+
+    def test_step_count_matches_what_the_trainer_would_do(self):
+        # HF floors len(dataloader) // grad_accum, then clamps to at least 1.
+        assert sft_mod.optimizer_steps(4, 1, 16, 3.0) == 3      # the Colab case
+        assert sft_mod.optimizer_steps(320, 1, 16, 3.0) == 60
+        assert sft_mod.optimizer_steps(32, 2, 8, 1.0) == 2
+
+    def test_a_dataset_too_small_to_train_on_is_refused(self, tmp_path):
+        path = tmp_path / "tiny.jsonl"
+        path.write_text('{"messages": [{"role": "user", "content": "a"}]}\n' * 4)
+        with pytest.raises(SystemExit, match="will not train anything"):
+            sft_mod.main(["--data", str(path), "--dry-run"])
+
+    def test_the_refusal_names_a_smaller_grad_accum(self, tmp_path, capsys):
+        path = tmp_path / "tiny.jsonl"
+        path.write_text('{"messages": [{"role": "user", "content": "a"}]}\n' * 4)
+        with pytest.raises(SystemExit) as exc:
+            sft_mod.main(["--data", str(path), "--dry-run"])
+        assert "--grad-accum" in str(exc.value) and "--no-require-correct" in str(exc.value)
+
+    def test_the_override_lets_it_through(self, tmp_path):
+        path = tmp_path / "tiny.jsonl"
+        path.write_text('{"messages": [{"role": "user", "content": "a"}]}\n' * 4)
+        assert sft_mod.main(["--data", str(path), "--dry-run", "--allow-tiny-dataset"]) == 0
+
+    def test_a_reasonable_dataset_is_not_blocked(self, tmp_path):
+        path = tmp_path / "ok.jsonl"
+        path.write_text('{"messages": [{"role": "user", "content": "a"}]}\n' * 200)
+        assert sft_mod.main(["--data", str(path), "--dry-run"]) == 0
+
+    def test_dpo_has_the_same_guard(self, tmp_path):
+        path = tmp_path / "tiny.jsonl"
+        path.write_text(json.dumps({
+            "prompt": [{"role": "user", "content": "q"}],
+            "chosen": [{"role": "assistant", "content": "a"}],
+            "rejected": [{"role": "assistant", "content": "b"}],
+        }) + "\n")
+        with pytest.raises(SystemExit, match="will not train anything"):
+            dpo_mod.main(["--data", str(path), "--dry-run"])
+
+
+class TestYieldReporting:
+    def test_low_yield_prints_the_levers(self):
+        from groundloop.data_gen.build_trajectories import summarize
+
+        out = summarize({"n": 51, "sft": [1] * 4, "prefs": [], "drops": {"failed": 47}})
+        assert "8% yield" in out
+        assert "--no-require-correct" in out and "--tau" in out
+
+    def test_healthy_yield_stays_quiet(self):
+        from groundloop.data_gen.build_trajectories import summarize
+
+        out = summarize({"n": 51, "sft": [1] * 33, "prefs": [1] * 26, "drops": {}})
+        assert "65% yield" in out and "--no-require-correct" not in out
+
+    def test_selection_and_reporting_thresholds_are_reported_separately(self):
+        from groundloop.data_gen.build_trajectories import summarize
+
+        out = summarize({"n": 10, "sft": [1] * 9, "prefs": [], "drops": {}}, 0.5, 0.7)
+        assert "0.5" in out and "reporting stays at 0.7" in out

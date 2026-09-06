@@ -126,6 +126,49 @@ def to_preference_record(traj: Trajectory) -> dict:
     }
 
 
+LOW_YIELD_PCT = 25.0
+
+
+def summarize(payload: dict, selection_tau: float | None = None,
+              reporting_tau: float | None = None) -> str:
+    """What the run kept, what it dropped, and whether that is a problem.
+
+    Yield is the number worth reading. A real model paraphrases, and the lexical
+    support check is at its weakest on paraphrase, so a near-zero yield is as
+    likely to be the metric rejecting good revisions as the model producing bad
+    ones. Either way, training on what survives is not worth the GPU time until
+    you know which.
+    """
+    n, kept = payload["n"], len(payload["sft"])
+    pct = 100.0 * kept / n if n else 0.0
+    lines = [
+        f"examples run:        {n}",
+        f"SFT records kept:    {kept}  ({pct:.0f}% yield)",
+        f"preference pairs:    {len(payload['prefs'])}",
+    ]
+    if selection_tau is not None:
+        lines.append(
+            f"selection threshold: {selection_tau} "
+            f"(reporting stays at {reporting_tau})"
+        )
+    if payload["drops"]:
+        lines.append("dropped:")
+        for reason, count in sorted(payload["drops"].items(), key=lambda kv: -kv[1]):
+            lines.append(f"  {count:>4}  {reason}")
+
+    if pct < LOW_YIELD_PCT:
+        lines += [
+            "",
+            "Yield is low. Work out which filter is rejecting revisions, and whether",
+            "it should be, before training on what is left:",
+            "  --no-require-correct   keep grounded revisions that miss the reference keys",
+            "  --tau 0.5              loosen the SELECTION threshold (reporting unaffected)",
+            "Fewer records than your effective batch means the trainer takes one step per",
+            "epoch and learns nothing; groundloop.train.sft will refuse rather than pretend.",
+        ]
+    return "\n".join(lines)
+
+
 def build(args) -> dict:
     llm = backend_from_args(args)
     tool = SearchTool()
@@ -193,22 +236,30 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--require-correct", action="store_true", default=True,
                     help="keep only revisions that also match the reference answer keys")
     ap.add_argument("--no-require-correct", dest="require_correct", action="store_false")
+    ap.add_argument("--tau", type=float, default=None,
+                    help="support threshold for SELECTION only (default: the reporting "
+                         "threshold from config). Loosen it to keep more trajectories; the "
+                         "eval still scores at the reporting threshold, so this trades "
+                         "training-data purity for volume rather than flattering the result.")
     ap.add_argument("--quiet", action="store_true")
     add_backend_args(ap)
     args = ap.parse_args(argv)
+
+    reporting_tau = config.SUPPORT_TAU_SENTENCE
+    if args.tau is not None:
+        # Selection threshold, deliberately separate from the reporting one. A
+        # real model paraphrases, and the lexical check is weakest on paraphrase,
+        # so the default bar can reject almost every revision and leave nothing
+        # to train on. Loosening selection is legitimate; loosening reporting
+        # would just be marking your own homework.
+        config.SUPPORT_TAU_SENTENCE = args.tau
 
     out_dir = Path(args.out_dir)
     payload = build(args)
     write_jsonl(out_dir / "sft.jsonl", payload["sft"])
     write_jsonl(out_dir / "prefs.jsonl", payload["prefs"])
 
-    print(f"\nexamples run:        {payload['n']}")
-    print(f"SFT records kept:    {len(payload['sft'])}")
-    print(f"preference pairs:    {len(payload['prefs'])}")
-    if payload["drops"]:
-        print("dropped:")
-        for reason, count in sorted(payload["drops"].items(), key=lambda kv: -kv[1]):
-            print(f"  {count:>4}  {reason}")
+    print(summarize(payload, args.tau, reporting_tau))
     print(f"\nwrote {out_dir / 'sft.jsonl'} and {out_dir / 'prefs.jsonl'}")
     return 0
 

@@ -78,3 +78,18 @@ def test_the_model_id_is_resolved_not_assumed(nb):
 def test_troubleshooting_covers_the_import_error(nb):
     prose = "".join("".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "markdown")
     assert "No module named 'groundloop'" in prose
+
+
+def test_the_colab_torchao_conflict_is_handled(nb):
+    # peft raises on torchao < 0.16 while probing for it, and Colab preinstalls
+    # 0.10, so the SFT cell dies unless setup removes it.
+    setup = "".join("".join(c["source"]) for c in _code_cells(nb))
+    assert "uninstall -y -q torchao" in setup
+    prose = "".join("".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "markdown")
+    assert "torchao" in prose, "troubleshooting does not mention the error"
+
+
+def test_low_yield_is_explained_before_training(nb):
+    prose = "".join("".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "markdown")
+    assert "yield" in prose.lower()
+    assert "--no-require-correct" in prose and "--tau" in prose

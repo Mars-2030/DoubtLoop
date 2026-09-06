@@ -141,7 +141,7 @@ standard-library Python.
 pip install -e .   # only needed to run `python -m groundloop...` directly;
                    # the `make` targets set PYTHONPATH themselves
 
-make test     # 117 tests, no GPU, no network, ~1s
+make test     # 128 tests, no GPU, no network, ~1s
 make smoke    # one question through all three conditions
 make eval     # regenerate results/comparison_table.md
 make results  # every table and transcript: ablation, stress, sensitivity
@@ -255,9 +255,13 @@ make dpo           # DPO on (grounded revision > original draft)
 ```
 
 `make data` **rejection-samples**: a trajectory is kept only when the revision is
-actually better than the draft by the harness's own measure. It prints how many
-examples each filter dropped, because a pipeline that silently keeps 8 of 39
-examples is one you should know about. The default SFT target is the *distilled*
+actually better than the draft by the harness's own measure. It prints the yield
+and what each filter dropped, and says so loudly below 25% — with a real model
+the binding constraint is usually the lexical support check's blindness to
+paraphrase, not the model. `--tau` loosens the *selection* threshold without
+touching the reporting one. The trainers refuse to start when the dataset is too
+small to take real optimizer steps, because four records at an effective batch of
+16 is three gradient steps and looks exactly like a successful run in the logs. The default SFT target is the *distilled*
 trajectory — question → tool call → tool result → grounded answer — because
 training on the full draft-then-fix transcript teaches the model to emit a bad
 answer first. `--style trajectory` keeps the critique turn, for testing whether
@@ -318,7 +322,7 @@ src/groundloop/
 demo/app.py                  Gradio, or --cli; runs with no training
 notebooks/                   Colab notebook: real weights, SFT, DPO, before/after
 scripts/make_transcripts.py  regenerates results/transcripts.md
-tests/                       117 tests
+tests/                       128 tests
 .github/workflows/ci.yml     tests on 3.10-3.12; runs the full pipeline and
                              fails if the committed results have drifted
 ```
