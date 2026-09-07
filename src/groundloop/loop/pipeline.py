@@ -145,6 +145,8 @@ def run_condition(
     if traj.critique is not None:
         traj.meta["critique_verdict"] = traj.critique.verdict
         traj.meta["critique_issues"] = len(traj.critique.unsupported)
+        traj.meta["critique_chars"] = len(traj.critique.raw.strip())
+        traj.meta["critique_notes"] = list(traj.critique.notes)
     return traj
 
 

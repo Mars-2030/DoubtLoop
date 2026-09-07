@@ -74,3 +74,47 @@ def test_trajectory_round_trips_to_json(llm, tool):
     blob = traj.to_json()
     assert blob["example_id"] == "x"
     assert isinstance(blob["evidence"], list) and isinstance(blob["tool_calls"], list)
+
+
+class TestEmptyCritiqueIsNotApproval:
+    """The one path where a format miss used to read as an all-clear.
+
+    An empty critique and a genuine "no issues found" are indistinguishable
+    downstream, so a model that emitted nothing was reported as having read the
+    evidence and endorsed its own wrong answer - and the loop skipped revision
+    on the strength of it.
+    """
+
+    def test_empty_critique_leaves_the_draft_unresolved(self):
+        c = parse_critique("   \n  ")
+        assert c.verdict == "revise"
+        assert any("empty" in n for n in c.notes)
+
+    def test_an_explicit_all_clear_is_still_an_all_clear(self):
+        assert parse_critique("ok").verdict == "ok"
+        assert parse_critique("No issues.").verdict == "ok"
+
+    def test_structured_approval_is_still_an_approval(self):
+        assert parse_critique('{"verdict": "ok", "issues": []}').verdict == "ok"
+
+    def test_an_empty_critique_still_triggers_a_revision_attempt(self, tool):
+        from groundloop.llm import LLM
+        from groundloop.loop.pipeline import run_condition
+
+        class SilentCritic(LLM):
+            """Answers normally but returns nothing for the critique stage."""
+
+            def generate(self, messages, *, stage="", ctx=None, tools=None,
+                         max_new_tokens=None, temperature=None):
+                if stage == "critique":
+                    return ""
+                if stage == "revise":
+                    return "revised text"
+                if stage == "tool":
+                    return '<tool_call>{"name": "search", "arguments": {"query": "apollo 11"}}</tool_call>'
+                return "a draft"
+
+        traj = run_condition(SilentCritic(), {"id": "x", "question": "Who stayed in lunar orbit?"},
+                             "groundloop", tool=tool)
+        assert traj.meta["revision_attempted"], "an empty critique silently skipped revision"
+        assert traj.final == "revised text"

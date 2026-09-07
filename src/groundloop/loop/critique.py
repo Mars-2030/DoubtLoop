@@ -67,8 +67,17 @@ def parse_critique(raw: str) -> Critique:
     # Not JSON. Fall back to reading it as prose: any non-empty line that is not
     # an explicit all-clear counts as an issue.
     lines = [ln.strip("-*• ").strip() for ln in text.splitlines() if ln.strip()]
-    if not lines or (len(lines) == 1 and re.fullmatch(r"(ok|no issues\.?|none\.?)", lines[0], re.I)):
-        return Critique(verdict="ok", raw=raw, notes=["empty critique"])
+    if not lines:
+        # A model that produced nothing has not approved anything. This was the
+        # one remaining path where a format miss read as an all-clear - and it
+        # is indistinguishable downstream from a genuine "looks fine", so a
+        # generation failure was being reported as the model endorsing its own
+        # wrong answer. The evidence is already in hand, so leave it unresolved
+        # and let the revision stage run.
+        return Critique(verdict="revise", raw=raw,
+                        notes=["critique came back empty; treating as unresolved, not as approval"])
+    if len(lines) == 1 and re.fullmatch(r"(ok|no issues\.?|none\.?)", lines[0], re.I):
+        return Critique(verdict="ok", raw=raw, notes=["explicit all-clear"])
     return Critique(
         verdict="revise",
         claims=[Claim(text=ln, supported=False, reason="unstructured critique") for ln in lines[:8]],

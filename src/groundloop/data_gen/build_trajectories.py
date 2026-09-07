@@ -240,6 +240,8 @@ def build(args) -> dict:
                 "revision_attempted": traj.meta.get("revision_attempted", False),
                 "critique_verdict": traj.meta.get("critique_verdict", ""),
                 "critique_issues": traj.meta.get("critique_issues", 0),
+                "critique_raw": (traj.critique.raw if traj.critique else "")[:240],
+                "critique_notes": traj.meta.get("critique_notes", []),
             })
             continue
         sft_rows.append(to_sft_record(traj, args.style))
@@ -290,6 +292,13 @@ def render_rejected(rejected: list[dict], limit: int) -> str:
                              f"{row.get('critique_verdict', '?')!r} with "
                              f"{row.get('critique_issues', 0)} issue(s), so the loop had nothing "
                              f"to act on - critique failure")
+        # The critique text itself: the difference between a model that read the
+        # evidence and approved a wrong answer, and one that emitted nothing.
+        if row.get("critique_raw") is not None and not row.get("revision_attempted"):
+            raw = " ".join(str(row.get("critique_raw", "")).split())
+            lines.append(f"    critique: {raw[:180] if raw else '(EMPTY - the model returned nothing)'}")
+            for note in row.get("critique_notes", []):
+                lines.append(f"    critique note: {note}")
     return "\n".join(lines)
 
 
