@@ -88,13 +88,18 @@ def check_dataset_size(n_records: int, args, min_steps: int = 10) -> None:
     produces an adapter, and the before/after comparison then reports that the
     method did nothing - which is true of the run and says nothing about the
     method.
+
+    On a --dry-run this warns instead of refusing. A dry run costs nothing and
+    trains nothing, so refusing it turns a useful heads-up into a broken build:
+    CI validates these scripts against the small scripted-backend dataset, and
+    that dataset is *meant* to be too small to train on.
     """
     effective = args.batch_size * args.grad_accum
     steps = optimizer_steps(n_records, args.batch_size, args.grad_accum, args.epochs)
     if steps >= min_steps or getattr(args, "allow_tiny_dataset", False):
         return
     suggested = max(1, n_records // max(args.batch_size, 1) // 2)
-    raise SystemExit(
+    message = (
         f"\n{n_records} records at an effective batch of {effective} gives only "
         f"{steps} optimizer step(s) across {args.epochs} epoch(s).\n"
         f"That will not train anything. Either:\n"
@@ -104,6 +109,10 @@ def check_dataset_size(n_records: int, args, min_steps: int = 10) -> None:
         f"  - lower the effective batch, e.g. --grad-accum {suggested}, or\n"
         f"  - pass --allow-tiny-dataset if a token run is genuinely what you want.\n"
     )
+    if getattr(args, "dry_run", False):
+        print(f"warning:{message}")
+        return
+    raise SystemExit(message)
 
 
 def describe(args, n_records: int) -> str:

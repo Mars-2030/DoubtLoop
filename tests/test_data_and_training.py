@@ -144,18 +144,26 @@ class TestNoOpTrainingGuard:
         assert sft_mod.optimizer_steps(320, 1, 16, 3.0) == 60
         assert sft_mod.optimizer_steps(32, 2, 8, 1.0) == 2
 
-    def test_a_dataset_too_small_to_train_on_is_refused(self, tmp_path):
-        path = tmp_path / "tiny.jsonl"
-        path.write_text('{"messages": [{"role": "user", "content": "a"}]}\n' * 4)
+    def test_a_real_run_on_a_dataset_too_small_is_refused(self):
+        args = sft_mod.build_parser().parse_args([])
         with pytest.raises(SystemExit, match="will not train anything"):
-            sft_mod.main(["--data", str(path), "--dry-run"])
+            sft_mod.check_dataset_size(4, args)
 
-    def test_the_refusal_names_a_smaller_grad_accum(self, tmp_path, capsys):
+    def test_the_refusal_names_a_smaller_grad_accum(self):
+        args = sft_mod.build_parser().parse_args([])
+        with pytest.raises(SystemExit) as exc:
+            sft_mod.check_dataset_size(4, args)
+        assert "--grad-accum" in str(exc.value) and "--no-require-correct" in str(exc.value)
+
+    def test_a_dry_run_warns_instead_of_failing(self, tmp_path, capsys):
+        # A dry run trains nothing, so refusing it turns a heads-up into a
+        # broken build - CI validates these scripts against the small scripted
+        # dataset, which is meant to be too small to train on.
         path = tmp_path / "tiny.jsonl"
         path.write_text('{"messages": [{"role": "user", "content": "a"}]}\n' * 4)
-        with pytest.raises(SystemExit) as exc:
-            sft_mod.main(["--data", str(path), "--dry-run"])
-        assert "--grad-accum" in str(exc.value) and "--no-require-correct" in str(exc.value)
+        assert sft_mod.main(["--data", str(path), "--dry-run"]) == 0
+        out = capsys.readouterr().out
+        assert "warning:" in out and "will not train anything" in out
 
     def test_the_override_lets_it_through(self, tmp_path):
         path = tmp_path / "tiny.jsonl"
@@ -167,15 +175,26 @@ class TestNoOpTrainingGuard:
         path.write_text('{"messages": [{"role": "user", "content": "a"}]}\n' * 200)
         assert sft_mod.main(["--data", str(path), "--dry-run"]) == 0
 
-    def test_dpo_has_the_same_guard(self, tmp_path):
+    def test_dpo_has_the_same_guard_and_the_same_dry_run_exemption(self, tmp_path):
+        args = dpo_mod.build_parser().parse_args([])
+        with pytest.raises(SystemExit, match="will not train anything"):
+            dpo_mod.check_dataset_size(1, args)
+
         path = tmp_path / "tiny.jsonl"
         path.write_text(json.dumps({
             "prompt": [{"role": "user", "content": "q"}],
             "chosen": [{"role": "assistant", "content": "a"}],
             "rejected": [{"role": "assistant", "content": "b"}],
         }) + "\n")
-        with pytest.raises(SystemExit, match="will not train anything"):
-            dpo_mod.main(["--data", str(path), "--dry-run"])
+        assert dpo_mod.main(["--data", str(path), "--dry-run"]) == 0
+
+    def test_ci_sized_data_passes_a_dry_run(self, tmp_path):
+        # The exact shape CI hits: the scripted backend yields ~32 records,
+        # which is 6 optimizer steps at the default batch - too few to train on,
+        # fine to validate.
+        path = tmp_path / "ci.jsonl"
+        path.write_text('{"messages": [{"role": "user", "content": "a"}]}\n' * 32)
+        assert sft_mod.main(["--data", str(path), "--dry-run"]) == 0
 
 
 class TestYieldReporting:
