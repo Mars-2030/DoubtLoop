@@ -37,7 +37,10 @@ def parse_critique(raw: str) -> Critique:
                 data = None
 
     if isinstance(data, dict):
-        issues = data.get("issues") or []
+        # "claims" is the grounded schema (every claim, each with a status);
+        # "issues" is the plain-critique one (problems only). Accept both, so
+        # trajectories logged under either shape still parse.
+        issues = data.get("claims") or data.get("issues") or []
         claims = []
         for issue in issues:
             if not isinstance(issue, dict):
@@ -54,14 +57,19 @@ def parse_critique(raw: str) -> Critique:
                     ),
                 )
             )
-        verdict = str(data.get("verdict", "")).lower()
-        if verdict not in ("ok", "revise"):
-            verdict = "revise" if any(not c.supported for c in claims) else "ok"
-        elif verdict == "ok" and any(not c.supported for c in claims):
-            # Small models routinely return {"verdict": "ok"} alongside a list of
-            # problems they just found. Believe the findings, not the label: an
-            # unsupported claim is a reason to revise whatever the header says.
+        # Findings outrank the label. Small models routinely return
+        # {"verdict": "ok"} beside a claim they just marked contradicted, and
+        # the header is the part they get wrong. With no findings, fall back to
+        # the stated verdict - a model that says "revise" and then fails to
+        # enumerate has still flagged something, and treating an enumeration
+        # miss as an all-clear is the failure this parser exists to avoid.
+        stated = str(data.get("verdict", "")).lower()
+        if any(not c.supported for c in claims):
             verdict = "revise"
+        elif stated in ("ok", "revise"):
+            verdict = stated
+        else:
+            verdict = "ok"
         return Critique(verdict=verdict, claims=claims, raw=raw)
 
     # Not JSON. Fall back to reading it as prose: any non-empty line that is not

@@ -141,7 +141,7 @@ standard-library Python.
 pip install -e .   # only needed to run `python -m groundloop...` directly;
                    # the `make` targets set PYTHONPATH themselves
 
-make test     # 150 tests, no GPU, no network, ~1s
+make test     # 155 tests, no GPU, no network, ~1s
 make smoke    # one question through all three conditions
 make eval     # regenerate results/comparison_table.md
 make results  # every table and transcript: ablation, stress, sensitivity
@@ -326,7 +326,7 @@ src/groundloop/
 demo/app.py                  Gradio, or --cli; runs with no training
 notebooks/                   Colab notebook: real weights, SFT, DPO, before/after
 scripts/make_transcripts.py  regenerates results/transcripts.md
-tests/                       150 tests
+tests/                       155 tests
 .github/workflows/ci.yml     tests on 3.10-3.12; runs the full pipeline and
                              fails if the committed results have drifted
 ```

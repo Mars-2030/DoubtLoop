@@ -118,3 +118,42 @@ class TestEmptyCritiqueIsNotApproval:
                              "groundloop", tool=tool)
         assert traj.meta["revision_attempted"], "an empty critique silently skipped revision"
         assert traj.final == "revised text"
+
+
+class TestCritiqueSchema:
+    """The grounded schema lists every claim with a status; the plain one lists
+    only problems. The parser has to read both, and must never let a
+    'supported' entry in a list called "issues" mean there was nothing wrong.
+    """
+
+    def test_the_grounded_schema_is_read_by_status_not_by_list_membership(self):
+        # Regression from the first real run: the prompt asked for every claim
+        # with a status, in a list named "issues", so the model dutifully
+        # returned {"status": "supported"} entries - and the parser read a
+        # non-empty issues list as "no problems", so the loop skipped revision.
+        raw = ('{"verdict": "ok", "claims": ['
+               '{"claim": "runs in the stroma", "status": "supported", "passage": "r02"},'
+               '{"claim": "needs no direct light", "status": "unsupported", "passage": ""}]}')
+        c = parse_critique(raw)
+        assert c.verdict == "revise"
+        assert [x.text for x in c.unsupported] == ["needs no direct light"]
+
+    def test_all_claims_supported_is_a_genuine_all_clear(self):
+        raw = '{"verdict": "ok", "claims": [{"claim": "a", "status": "supported", "passage": "r01"}]}'
+        assert parse_critique(raw).verdict == "ok"
+
+    def test_a_stated_revise_survives_an_empty_list(self):
+        # Flagged but not enumerated still means flagged.
+        assert parse_critique('{"verdict": "revise", "issues": []}').verdict == "revise"
+
+    def test_the_legacy_issues_key_still_parses(self):
+        raw = '{"verdict": "revise", "issues": [{"claim": "x", "problem": "invented"}]}'
+        assert parse_critique(raw).unsupported[0].text == "x"
+
+    def test_the_grounded_prompt_does_not_call_supported_claims_issues(self):
+        from groundloop import prompts
+
+        body = prompts.CRITIQUE_GROUNDED_USER
+        assert '"claims"' in body
+        assert '"issues"' not in body, "a supported claim is not an issue"
+        assert "only if one of the passages above states it" in body

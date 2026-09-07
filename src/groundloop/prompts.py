@@ -96,7 +96,8 @@ Draft answer:
 Critique this draft against the constitution above. Identify any claim that is
 unsupported, overstated, or that accepts a false premise in the question.
 
-Reply with JSON only:
+Reply with JSON only. List ONLY the claims that have a problem; if the draft is
+fine, return an empty list:
 {{"verdict": "ok" | "revise",
   "issues": [{{"claim": "<quoted from the draft>", "principle": "<P#>", "problem": "<what is wrong>", "fix": "<what to do instead>"}}]}}
 """
@@ -122,9 +123,13 @@ contradicts it, or is silent. If the evidence contradicts what you believe,
 the evidence wins. If the evidence is silent on the question, the correct
 critique is that the draft should abstain.
 
-Reply with JSON only:
-{{"verdict": "ok" | "revise",
-  "issues": [{{"claim": "<quoted from the draft>", "principle": "<P#>", "status": "supported" | "contradicted" | "unsupported", "passage": "<id or empty>", "problem": "<what is wrong>", "fix": "<what to do instead>"}}]}}
+A claim counts as "supported" only if one of the passages above states it, and
+you must name that passage. Being plausible, being consistent with the
+evidence, or being something you already believed is not support. If you cannot
+point at a passage, the status is "unsupported".
+
+Reply with JSON only. List EVERY factual claim in the draft, one entry each:
+{{"claims": [{{"claim": "<quoted from the draft>", "status": "supported" | "contradicted" | "unsupported", "passage": "<id, required when status is supported>", "principle": "<P#, when there is a problem>", "problem": "<what is wrong, or empty>", "fix": "<what to do instead, or empty>"}}]}}
 """
 
 REVISE_PLAIN_USER = """Question: {question}
