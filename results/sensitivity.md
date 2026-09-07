@@ -11,10 +11,10 @@ re-generated; only the bar for calling a claim supported moved.
 | tau | base | plain critique | GroundLoop | gap (plain − GroundLoop) |
 |---|---|---|---|---|
 | 0.50 | 61.5% | 61.5% | 2.6% | 58.9 pts |
-| 0.60 | 66.7% | 66.7% | 2.6% | 64.1 pts |
-| 0.70 ←default | 69.2% | 69.2% | 2.6% | 66.6 pts |
-| 0.80 | 69.2% | 69.2% | 2.6% | 66.6 pts |
-| 0.90 | 69.2% | 69.2% | 2.6% | 66.6 pts |
+| 0.60 | 64.1% | 64.1% | 2.6% | 61.5 pts |
+| 0.70 ←default | 66.7% | 66.7% | 2.6% | 64.1 pts |
+| 0.80 | 66.7% | 66.7% | 2.6% | 64.1 pts |
+| 0.90 | 66.7% | 66.7% | 2.6% | 64.1 pts |
 
 A metric doing its job gets stricter with tau in every column at once.
 What matters is the last column: if the gap survives the whole sweep,
@@ -25,7 +25,7 @@ at one end, say so - that is the honest headline, not the default row.
 
 | k | hallucination rate | accuracy | over-abstention | correct abstention |
 |---|---|---|---|---|
-| 1 | 0.0% | 64.1% | 13.9% | 100.0% |
+| 1 | 0.0% | 64.1% | 11.1% | 100.0% |
 | 2 | 2.6% | 64.1% | 8.3% | 66.7% |
 | 4 ←default | 2.6% | 66.7% | 5.6% | 66.7% |
 | 8 | 2.6% | 66.7% | 5.6% | 66.7% |

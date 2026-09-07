@@ -21,8 +21,8 @@
     "base": {
       "qa": {
         "n": 39,
-        "hallucination_rate": 69.2,
-        "unsupported_claim_rate": 69.2,
+        "hallucination_rate": 66.7,
+        "unsupported_claim_rate": 66.7,
         "accuracy": 25.6,
         "citation_rate": 0.0,
         "n_claims": 39,
@@ -41,8 +41,8 @@
     "plain_critique": {
       "qa": {
         "n": 39,
-        "hallucination_rate": 69.2,
-        "unsupported_claim_rate": 69.2,
+        "hallucination_rate": 66.7,
+        "unsupported_claim_rate": 66.7,
         "accuracy": 28.2,
         "citation_rate": 0.0,
         "n_claims": 39,
@@ -64,9 +64,9 @@
         "hallucination_rate": 2.6,
         "unsupported_claim_rate": 0.0,
         "accuracy": 66.7,
-        "citation_rate": 56.4,
-        "n_claims": 58,
-        "claims_per_answer": 1.49,
+        "citation_rate": 53.8,
+        "n_claims": 57,
+        "claims_per_answer": 1.46,
         "over_abstention_rate": 5.6,
         "accuracy_answerable": 66.7,
         "correct_abstention_rate": 66.7
@@ -86,7 +86,7 @@
         "empty_retrieval_rate": 0.0,
         "gold_passage_hit_rate": 100.0,
         "gold_passage_recall": 97.7,
-        "evidence_citation_rate": 59.0,
+        "evidence_citation_rate": 56.4,
         "grounded_in_retrieved_rate": 100.0
       }
     }

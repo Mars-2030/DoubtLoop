@@ -36,8 +36,8 @@ question ──▶ draft ──▶ extract claims ──▶ search(query)   [too
 
 | Setting | Hallucination rate ↓ | Unsupported claims ↓ | Accuracy ↑ | Sycophancy pushback ↑ |
 |---|---|---|---|---|
-| Base model, no critique | 69.2% | 69.2% | 25.6% | 0.0% |
-| + plain self-critique (constitution only) | 69.2% | 69.2% | 28.2% | 0.0% |
+| Base model, no critique | 66.7% | 66.7% | 25.6% | 0.0% |
+| + plain self-critique (constitution only) | 66.7% | 66.7% | 28.2% | 0.0% |
 | + GroundLoop (constitution + retrieval) | **2.6%** | **0.0%** | **66.7%** | **50.0%** |
 
 > ⚠️ **These particular numbers are not a model result.** They come from
@@ -71,8 +71,8 @@ generations, re-scored at each bar.
 | tau | base | plain critique | GroundLoop | gap |
 |---|---|---|---|---|
 | 0.50 | 61.5% | 61.5% | 2.6% | 58.9 pts |
-| 0.70 ←default | 69.2% | 69.2% | 2.6% | 66.6 pts |
-| 0.90 | 69.2% | 69.2% | 2.6% | 66.6 pts |
+| 0.70 ←default | 66.7% | 66.7% | 2.6% | 64.1 pts |
+| 0.90 | 66.7% | 66.7% | 2.6% | 64.1 pts |
 
 The gap survives the whole sweep. Building this found a real bug: the
 contradiction veto used to sit inside the sentence tier as an early return, so
@@ -141,7 +141,7 @@ standard-library Python.
 pip install -e .   # only needed to run `python -m groundloop...` directly;
                    # the `make` targets set PYTHONPATH themselves
 
-make test     # 155 tests, no GPU, no network, ~1s
+make test     # 160 tests, no GPU, no network, ~1s
 make smoke    # one question through all three conditions
 make eval     # regenerate results/comparison_table.md
 make results  # every table and transcript: ablation, stress, sensitivity
@@ -326,7 +326,7 @@ src/groundloop/
 demo/app.py                  Gradio, or --cli; runs with no training
 notebooks/                   Colab notebook: real weights, SFT, DPO, before/after
 scripts/make_transcripts.py  regenerates results/transcripts.md
-tests/                       155 tests
+tests/                       160 tests
 .github/workflows/ci.yml     tests on 3.10-3.12; runs the full pipeline and
                              fails if the committed results have drifted
 ```

@@ -124,3 +124,47 @@ class TestNumericDisagreement:
 def test_abstention_detection():
     assert T.is_abstention("The corpus does not say.")
     assert not T.is_abstention("The station day is 31 hours.")
+
+
+class TestStemming:
+    """Four separate false negatives on real-model output came from one word
+    appearing in different forms in the claim and in the passage."""
+
+    def test_inflections_and_one_derivation_collapse(self):
+        assert T.stem("deciphered") == T.stem("decipherment") == "decipher"
+        assert T.stem("membranes") == T.stem("membrane")
+        assert T.stem("requires") == T.stem("require")
+
+    def test_it_does_not_invent_matches(self):
+        # An invented match is the expensive direction: it turns "the model is
+        # wrong" into "the scorer cannot read".
+        assert T.stem("foundation") != T.stem("found")
+        assert T.stem("transistor") != T.stem("transit")
+        assert T.stem("class") == "class", "'ss' must survive plural stripping"
+
+    def test_short_words_are_left_alone(self):
+        for word in ("gas", "is", "was", "ion"):
+            assert T.stem(word) == word
+
+    def test_a_correct_two_sentence_answer_is_supported(self):
+        # The claim spans two sentences of one passage and uses "deciphered"
+        # where the passage says "decipherment"; it scored 0.787 against a 0.80
+        # bar before stemming.
+        evidence = [("r03", "The Rosetta Stone was found near Rashid in Egypt in 1799 by French "
+                            "soldiers. It carries a decree issued at Memphis in 196 BC on behalf of "
+                            "Ptolemy V. Jean-Francois Champollion announced his decipherment of the "
+                            "hieroglyphic text in 1822.")]
+        ok, _, _, _ = T.check_claim_default(
+            "The Rosetta Stone was found in 1799 and deciphered in 1822.", evidence)
+        assert ok
+
+    def test_grounding_is_not_correctness(self):
+        # "deciphered in 1799" is factually wrong, but every number it states
+        # does appear in the passage, so a grounding check cannot catch it -
+        # the reference-answer check is what does. Conflating the two would
+        # make the grounding metric unfalsifiable.
+        evidence = [("r03", "The Rosetta Stone was found near Rashid in Egypt in 1799 by French "
+                            "soldiers. Champollion announced his decipherment in 1822.")]
+        ok, _, _, _ = T.check_claim_default(
+            "The Rosetta Stone was found in 1799 and deciphered in 1799.", evidence)
+        assert ok, "the grounding check is not expected to catch a role-swapped number"

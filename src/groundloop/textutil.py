@@ -208,28 +208,42 @@ def _has_negation(tokens) -> bool:
     return any(t in _NEGATIONS for t in tokens)
 
 
-def _plural_fold(tokens, vocabulary):
-    """Fold 'membranes' onto 'membrane' when the singular is what the source uses.
+# No "-ation"/"-ion": they collapse "foundation" onto "found", and an invented
+# match is the expensive direction for a hallucination metric.
+_STEM_SUFFIXES = ("ments", "ment", "ings", "ing", "ed")
 
-    Only this one morphological rule, and only when the folded form is actually
-    present. Anything more aggressive starts inventing matches, which for a
-    hallucination metric is failure in the expensive direction.
+
+def stem(token: str) -> str:
+    """A deliberately small stemmer: plurals, then one derivational suffix.
+
+    Four separate false negatives on real-model output traced to the same
+    thing - a claim and the passage supporting it using different forms of one
+    word. "The Rosetta Stone was found in 1799 and deciphered in 1822" is
+    exactly right and scored 0.787 against a 0.80 bar, missing only because the
+    passage says "decipherment" where the claim says "deciphered".
+
+    Kept blunt on purpose. Aggressive stemming invents matches, and for a
+    hallucination metric a false match is the expensive direction: it is the
+    difference between "the model is wrong" and "the scorer cannot read".
     """
-    out = set()
-    for t in tokens:
-        if t in vocabulary:
-            out.add(t)
-        elif t.endswith("s") and t[:-1] in vocabulary:
-            out.add(t[:-1])
-        elif t.endswith("es") and t[:-2] in vocabulary:
-            out.add(t[:-2])
-        elif t + "s" in vocabulary:
-            out.add(t + "s")
-        elif t + "es" in vocabulary:
-            out.add(t + "es")
-        else:
-            out.add(t)
-    return out
+    t = token
+    # Porter step 1a, roughly: plurals without mangling "ss" or short words.
+    if t.endswith("sses"):
+        t = t[:-2]
+    elif t.endswith("ies") and len(t) > 4:
+        t = t[:-3] + "y"
+    elif t.endswith("ss"):
+        pass
+    elif t.endswith("s") and len(t) > 3:
+        t = t[:-1]
+    for suffix in _STEM_SUFFIXES:
+        if t.endswith(suffix) and len(t) - len(suffix) >= 4:
+            return t[: -len(suffix)]
+    return t
+
+
+def _stems(tokens) -> set[str]:
+    return {stem(t) for t in tokens}
 
 
 @functools.lru_cache(maxsize=1)
@@ -239,9 +253,8 @@ def _corpus_idf() -> tuple[dict[str, float], float]:
     Coverage has to be weighted, not counted. "The Sable coating was developed
     in-house by the Consortium's own materials lab" shares five of its eight
     content words with a passage that says the exact opposite - Halden
-    Materials, an outside supplier, developed it - because the shared words
-    ('coating', 'developed', 'consortium', 'materials') are the common ones and
-    the distinguishing ones ('in-house', 'lab') are rare. Unweighted overlap
+    Materials, an outside supplier, developed it - because the shared words are
+    the common ones and the distinguishing ones are rare. Unweighted overlap
     scores that fabrication as supported.
 
     A token the corpus has never seen gets the maximum weight: an invented
@@ -289,13 +302,15 @@ def coverage(claim: str, passage_text: str) -> float:
     claim_toks = set(content_tokens(strip_citations(claim)))
     if not claim_toks:
         return 0.0
-    hay = set(content_tokens(strip_citations(passage_text)))
-    folded = _plural_fold(claim_toks, hay)
-    w = _weights(folded)
+    hay = _stems(content_tokens(strip_citations(passage_text)))
+    # Weight by the surface token's IDF, but match on the stem, so a claim is
+    # not penalised for saying "deciphered" where the source says
+    # "decipherment".
+    w = _weights(claim_toks)
     total = sum(w.values())
     if total <= 0:
         return 0.0
-    hit = sum(w[t] for t in folded if t in hay)
+    hit = sum(w[t] for t in claim_toks if stem(t) in hay)
     return hit / total
 
 
