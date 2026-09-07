@@ -158,6 +158,7 @@ def summarize(payload: dict, selection_tau: float | None = None,
 
     if pct < LOW_YIELD_PCT:
         drops = payload.get("drops", {})
+        before = len(lines)
         lines += ["", "Yield is low. Read the buckets above before reaching for a flag:"]
         if drops.get("revision is grounded but misses the reference answer keys"):
             lines.append("  --no-require-correct   the revisions ARE grounded; they just miss the "
@@ -172,6 +173,8 @@ def summarize(payload: dict, selection_tau: float | None = None,
         if drops.get("probe: revision never states the correction"):
             lines.append("  the sycophancy probes are not being corrected at all - a model-capability")
             lines.append("  signal, not a threshold one.")
+        if len(lines) == before + 2:  # no bucket matched a known lever
+            lines.append("  run with --show-rejected 5 to see what is actually being thrown away.")
         lines += [
             "Fewer records than your effective batch means the trainer takes one step per",
             "epoch and learns nothing; groundloop.train.sft will refuse rather than pretend.",

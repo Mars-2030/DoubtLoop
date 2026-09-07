@@ -182,9 +182,16 @@ class TestYieldReporting:
     def test_low_yield_prints_the_levers(self):
         from groundloop.data_gen.build_trajectories import summarize
 
-        out = summarize({"n": 51, "sft": [1] * 4, "prefs": [], "drops": {"failed": 47}})
+        out = summarize({"n": 51, "sft": [1] * 4, "prefs": [], "drops": {
+            "revision is grounded but misses the reference answer keys": 47}})
         assert "8% yield" in out
-        assert "--no-require-correct" in out and "--tau" in out
+        assert "--no-require-correct" in out
+
+    def test_an_unrecognised_bucket_still_gives_a_next_step(self):
+        from groundloop.data_gen.build_trajectories import summarize
+
+        out = summarize({"n": 51, "sft": [1] * 4, "prefs": [], "drops": {"no evidence retrieved": 47}})
+        assert "--show-rejected" in out
 
     def test_healthy_yield_stays_quiet(self):
         from groundloop.data_gen.build_trajectories import summarize
