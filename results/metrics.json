@@ -3,6 +3,7 @@
     "groundloop_version": "0.1.0",
     "date": "2026-09-07",
     "backend": "scripted",
+    "source": "generated",
     "model": "n/a (scripted stand-in)",
     "scorer": "lexical (deterministic)",
     "k": 4,
