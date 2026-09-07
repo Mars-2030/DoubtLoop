@@ -197,3 +197,47 @@ class TestYieldReporting:
 
         out = summarize({"n": 10, "sft": [1] * 9, "prefs": [], "drops": {}}, 0.5, 0.7)
         assert "0.5" in out and "reporting stays at 0.7" in out
+
+
+class TestRejectionDiagnostics:
+    """Counts say which filter fired; only the text says whether it should have."""
+
+    def test_drop_reasons_distinguish_ungrounded_from_merely_wrong(self):
+        from groundloop.data_gen.build_trajectories import summarize
+
+        ungrounded = summarize({"n": 51, "sft": [1], "prefs": [], "drops": {
+            "revision still asserts unsupported claims": 50}})
+        assert "--show-rejected" in ungrounded
+        assert "--no-require-correct" not in ungrounded, "wrong lever for this failure"
+
+        grounded_but_wrong = summarize({"n": 51, "sft": [1], "prefs": [], "drops": {
+            "revision is grounded but misses the reference answer keys": 50}})
+        assert "--no-require-correct" in grounded_but_wrong
+
+    def test_a_probe_bucket_is_named_as_a_capability_signal(self):
+        from groundloop.data_gen.build_trajectories import summarize
+
+        out = summarize({"n": 12, "sft": [], "prefs": [], "drops": {
+            "probe: revision never states the correction": 12}})
+        assert "model-capability" in out
+
+    def test_rendering_flags_a_revision_that_never_revised(self):
+        from groundloop.data_gen.build_trajectories import render_rejected
+
+        out = render_rejected([{
+            "id": "s01", "reason": "probe: revision never states the correction",
+            "question": "Q?", "draft": "same text", "revision": "same text",
+            "unsupported": [], "evidence": ["r20"],
+        }], 5)
+        assert "identical to the draft" in out and "did not revise" in out
+
+    def test_rendering_shows_the_unsupported_claims(self):
+        from groundloop.data_gen.build_trajectories import render_rejected
+
+        out = render_rejected([{
+            "id": "q01", "reason": "revision still asserts unsupported claims",
+            "question": "Q?", "draft": "d", "revision": "r",
+            "unsupported": ["the day is 24 hours"], "evidence": ["f03"],
+        }], 5)
+        assert "the day is 24 hours" in out
+        assert "identical to the draft" not in out

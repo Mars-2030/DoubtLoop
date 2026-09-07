@@ -157,12 +157,22 @@ def summarize(payload: dict, selection_tau: float | None = None,
             lines.append(f"  {count:>4}  {reason}")
 
     if pct < LOW_YIELD_PCT:
+        drops = payload.get("drops", {})
+        lines += ["", "Yield is low. Read the buckets above before reaching for a flag:"]
+        if drops.get("revision is grounded but misses the reference answer keys"):
+            lines.append("  --no-require-correct   the revisions ARE grounded; they just miss the "
+                         "reference keys")
+        if drops.get("revision still asserts unsupported claims"):
+            lines.append("  the revisions are not grounded. --tau 0.5 loosens SELECTION only, but "
+                         "first")
+            lines.append("  run with --show-rejected 5: if a revision quotes the right passage and "
+                         "is still")
+            lines.append("  rejected, that is the metric; if it repeats the draft, that is the model,")
+            lines.append("  and a bigger model for THIS step is the fix rather than a looser filter.")
+        if drops.get("probe: revision never states the correction"):
+            lines.append("  the sycophancy probes are not being corrected at all - a model-capability")
+            lines.append("  signal, not a threshold one.")
         lines += [
-            "",
-            "Yield is low. Work out which filter is rejecting revisions, and whether",
-            "it should be, before training on what is left:",
-            "  --no-require-correct   keep grounded revisions that miss the reference keys",
-            "  --tau 0.5              loosen the SELECTION threshold (reporting unaffected)",
             "Fewer records than your effective batch means the trainer takes one step per",
             "epoch and learns nothing; groundloop.train.sft will refuse rather than pretend.",
         ]
@@ -177,6 +187,7 @@ def build(args) -> dict:
 
     sft_rows, pref_rows = [], []
     drops: Counter[str] = Counter()
+    rejected: list[dict] = []
     n = 0
 
     for ex in qa + probe:
@@ -204,7 +215,26 @@ def build(args) -> dict:
             drops["no evidence retrieved"] += 1
             continue
         if not good:
-            drops["revision still fails the check"] += 1
+            # One bucket per cause. "Still asserts things the evidence does not
+            # support" and "grounded but does not match the reference answer"
+            # are different failures needing different responses, and lumping
+            # them together leaves you guessing which lever to pull.
+            if is_probe:
+                reason = "probe: revision never states the correction"
+            elif after.n_unsupported:
+                reason = "revision still asserts unsupported claims"
+            else:
+                reason = "revision is grounded but misses the reference answer keys"
+            drops[reason] += 1
+            rejected.append({
+                "id": ex.get("id", ""),
+                "reason": reason,
+                "question": _question_text(ex),
+                "draft": traj.draft,
+                "revision": traj.final,
+                "unsupported": list(getattr(after, "unsupported_claims", []))[:3],
+                "evidence": [p.id for p in traj.evidence],
+            })
             continue
         sft_rows.append(to_sft_record(traj, args.style))
 
@@ -218,7 +248,36 @@ def build(args) -> dict:
 
     if not args.quiet:
         print(file=sys.stderr)
-    return {"sft": sft_rows, "prefs": pref_rows, "drops": dict(drops), "n": n}
+    return {"sft": sft_rows, "prefs": pref_rows, "drops": dict(drops),
+            "rejected": rejected, "n": n}
+
+
+def _question_text(example: dict) -> str:
+    return example.get("question") or example.get("prompt") or ""
+
+
+def render_rejected(rejected: list[dict], limit: int) -> str:
+    """Show what a rejected revision actually looked like.
+
+    The counts say which filter fired; only the text says whether it should
+    have. A revision that quotes the right passage and is rejected anyway is a
+    metric problem; one that repeats the draft verbatim is a model problem.
+    """
+    lines = ["", "rejected revisions:"]
+    for row in rejected[:limit]:
+        lines += [
+            "",
+            f"  [{row['id']}] {row['reason']}",
+            f"    Q:        {row['question']}",
+            f"    draft:    {row['draft'][:200]}",
+            f"    revision: {row['revision'][:200]}",
+            f"    evidence: {', '.join(row['evidence'])}",
+        ]
+        for claim in row["unsupported"]:
+            lines.append(f"    unsupported: {claim[:160]}")
+        if row["draft"].strip() == row["revision"].strip():
+            lines.append("    NOTE: the revision is identical to the draft - the model did not revise")
+    return "\n".join(lines)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -241,6 +300,9 @@ def main(argv: list[str] | None = None) -> int:
                          "threshold from config). Loosen it to keep more trajectories; the "
                          "eval still scores at the reporting threshold, so this trades "
                          "training-data purity for volume rather than flattering the result.")
+    ap.add_argument("--show-rejected", type=int, default=0, metavar="N",
+                    help="print N rejected revisions in full. The counts say which "
+                         "filter fired; only the text says whether it should have.")
     ap.add_argument("--quiet", action="store_true")
     add_backend_args(ap)
     args = ap.parse_args(argv)
@@ -260,6 +322,8 @@ def main(argv: list[str] | None = None) -> int:
     write_jsonl(out_dir / "prefs.jsonl", payload["prefs"])
 
     print(summarize(payload, args.tau, reporting_tau))
+    if args.show_rejected and payload["rejected"]:
+        print(render_rejected(payload["rejected"], args.show_rejected))
     print(f"\nwrote {out_dir / 'sft.jsonl'} and {out_dir / 'prefs.jsonl'}")
     return 0
 
