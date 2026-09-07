@@ -24,6 +24,7 @@ from groundloop import __version__, config
 from groundloop.datasets import load_qa, load_sycophancy, read_jsonl, write_jsonl
 from groundloop.eval import hallucination_rate as hall
 from groundloop.eval import sycophancy_probe as syco
+from groundloop.eval import critique_quality as critique_eval
 from groundloop.eval import tool_use_quality as tools_eval
 from groundloop.llm import add_backend_args, backend_from_args
 from groundloop.loop.pipeline import CONDITIONS, run_dataset
@@ -97,6 +98,7 @@ def run(args, out_dir: Path) -> dict:
         entry = {"qa": qa_summary, "sycophancy": probe_summary}
         if condition == "groundloop":
             entry["tool_use"] = tools_eval.score_trajectories(qa_trajs, qa)
+            entry["critique"] = critique_eval.score_trajectories(qa_trajs)[1]
         results[condition] = entry
 
     if not replay:
@@ -227,6 +229,32 @@ def render_markdown(payload: dict) -> str:
             if key in tu:
                 unit = "%" if key.endswith(("rate", "recall")) else ""
                 lines.append(f"| {label} | {tu[key]}{unit} |")
+
+    cq = conds["groundloop"].get("critique", {})
+    if cq.get("claims_paired"):
+        lines += [
+            "", "## Self-critique vs the evidence (GroundLoop condition)", "",
+            "Whether the critique step agrees with the passages it was shown. If it",
+            "endorses whatever the draft said, retrieval and revision are both wasted.",
+            "", "| Metric | Value |", "|---|---|",
+        ]
+        for key, label in {
+            "claims_paired": "Claims judged by both",
+            "agreement_rate": "Agreement with the evidence check",
+            "false_approval_rate": "Approved what the evidence does not support",
+            "false_alarm_rate": "Rejected what the evidence does support",
+            "blind_critique_rate": "Waved through a draft with a real error",
+        }.items():
+            if key in cq:
+                unit = "%" if key.endswith("rate") else ""
+                lines.append(f"| {label} | {cq[key]}{unit} |")
+        lines += [
+            "",
+            "Agreement with the lexical check, not with ground truth, so",
+            "false approval is an upper bound on the model's error and false alarm a",
+            "lower bound. With the scripted stand-in these are trivially 100% / 0%:",
+            "its critique *is* the lexical check, so it cannot disagree with itself.",
+        ]
 
     lines += [
         "",

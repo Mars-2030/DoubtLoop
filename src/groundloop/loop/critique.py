@@ -135,6 +135,7 @@ def annotate_with_evidence(parsed: Critique, draft: str, evidence: list[Passage]
         ok, pid, cov, reason = check_claim_default(text, evidence)
         checked.append(Claim(text=text, supported=ok, best_passage=pid, coverage=round(cov, 3), reason=reason))
     parsed.notes.append(f"harness: {sum(1 for c in checked if not c.supported)}/{len(checked)} draft claims unsupported")
+    parsed.harness_claims = checked
     parsed.claims = parsed.claims or checked
     return parsed
 

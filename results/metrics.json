@@ -88,6 +88,16 @@
         "gold_passage_recall": 97.7,
         "evidence_citation_rate": 56.4,
         "grounded_in_retrieved_rate": 100.0
+      },
+      "critique": {
+        "n_examples": 39,
+        "claims_paired": 39,
+        "claims_unpaired": 0,
+        "agreement_rate": 100.0,
+        "false_approval_rate": 0.0,
+        "false_alarm_rate": 0.0,
+        "blind_critique_rate": 0.0,
+        "examples_with_errors": 26
       }
     }
   }

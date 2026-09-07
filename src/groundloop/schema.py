@@ -57,6 +57,11 @@ class Claim:
 class Critique:
     verdict: str = "ok"  # "ok" | "revise"
     claims: list[Claim] = field(default_factory=list)
+    # The harness's own verdict on the same draft claims, recorded alongside the
+    # model's rather than replacing it. Keeping both is what makes it possible
+    # to ask whether the model's self-critique agrees with the evidence - which
+    # is the question the method turns on.
+    harness_claims: list[Claim] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     raw: str = ""
 

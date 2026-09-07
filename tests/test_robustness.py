@@ -202,3 +202,71 @@ class TestRescoringWithoutRegenerating:
 
         retrieval_stress.main(["--modes", "normal", "--limit", "3", "--out-dir", str(tmp_path)])
         assert (tmp_path / "raw" / "stress_normal.jsonl").exists()
+
+
+class TestCritiqueQuality:
+    """Whether the model's self-critique agrees with the evidence it was shown.
+
+    The measurement the method turns on: if the critique endorses whatever the
+    draft said, retrieval and revision are both wasted.
+    """
+
+    @staticmethod
+    def _traj(model_supported, harness_supported, claim="the crew stayed in lunar orbit"):
+        return {
+            "example_id": "q01",
+            "critique": {
+                "claims": [{"text": claim, "supported": model_supported, "best_passage": "r01"}],
+                "harness_claims": [{"text": claim, "supported": harness_supported,
+                                    "reason": "not covered by the evidence", "coverage": 0.4}],
+            },
+        }
+
+    def test_false_approval_is_counted(self):
+        from groundloop.eval import critique_quality
+
+        rows, summary = critique_quality.score_trajectories([self._traj(True, False)])
+        assert summary["false_approval_rate"] == 100.0
+        assert summary["blind_critique_rate"] == 100.0
+        assert "approved what the evidence does not support" in rows[0]["kind"]
+
+    def test_false_alarm_is_counted_separately(self):
+        from groundloop.eval import critique_quality
+
+        _rows, summary = critique_quality.score_trajectories([self._traj(False, True)])
+        assert summary["false_alarm_rate"] == 100.0 and summary["false_approval_rate"] == 0.0
+
+    def test_agreement(self):
+        from groundloop.eval import critique_quality
+
+        _rows, summary = critique_quality.score_trajectories(
+            [self._traj(True, True), self._traj(False, False)])
+        assert summary["agreement_rate"] == 100.0
+        assert summary["blind_critique_rate"] == 0.0
+
+    def test_claims_are_paired_by_overlap_not_by_index(self):
+        from groundloop.eval.critique_quality import pair_claims
+
+        harness = [{"text": "The Calvin cycle runs in the stroma of the chloroplast."},
+                   {"text": "It does not require direct light."}]
+        model = [{"text": "It does not require direct light"},
+                 {"text": "The Calvin cycle runs in the stroma"}]
+        pairs = pair_claims(model, harness)
+        assert pairs[0][1]["text"].startswith("The Calvin cycle")
+        assert pairs[1][1]["text"].startswith("It does not")
+
+    def test_an_unmatched_claim_is_not_silently_scored(self):
+        from groundloop.eval import critique_quality
+
+        traj = self._traj(True, False)
+        traj["critique"]["claims"] = [{"text": "something else entirely", "supported": True}]
+        _rows, summary = critique_quality.score_trajectories([traj])
+        assert summary["claims_unpaired"] == 1 and summary["claims_paired"] == 0
+
+    def test_the_harness_verdict_is_recorded_alongside_the_models(self, llm, tool):
+        from groundloop.loop.pipeline import run_condition
+
+        traj = run_condition(llm, {"id": "q25", "question": "How many hours in a KS-9 station day?"},
+                             "groundloop", tool=tool)
+        assert traj.critique.harness_claims, "the harness verdict was not kept"
+        assert traj.to_json()["critique"]["harness_claims"]

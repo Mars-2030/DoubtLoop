@@ -141,7 +141,7 @@ standard-library Python.
 pip install -e .   # only needed to run `python -m groundloop...` directly;
                    # the `make` targets set PYTHONPATH themselves
 
-make test     # 160 tests, no GPU, no network, ~1s
+make test     # 166 tests, no GPU, no network, ~1s
 make smoke    # one question through all three conditions
 make eval     # regenerate results/comparison_table.md
 make results  # every table and transcript: ablation, stress, sensitivity
@@ -236,6 +236,12 @@ condition and not from three slightly different harnesses.
 - `retrieval_stress` — the same loop with gold removed, with irrelevant padding,
   or with search returning nothing. Measures whether the model abstains when
   its evidence cannot support an answer, or keeps answering with citations.
+- `critique_quality` — whether the model's self-critique agrees with the
+  passages it was shown. The method assumes it does; if the critique endorses
+  whatever the draft said, retrieval and revision are both wasted. `false
+  approval` (the model marks a claim supported, naming a passage, where the
+  evidence does not support it) is the number that decides whether GroundLoop
+  can work at a given model size.
 - `sensitivity` — the threshold and `k` sweeps above.
 - `run_all` — the three-way ablation, into `results/`. Every trajectory is saved
   under `<out-dir>/raw/`, and `--from-trajectories <dir>` re-scores a previous run
@@ -326,7 +332,7 @@ src/groundloop/
 demo/app.py                  Gradio, or --cli; runs with no training
 notebooks/                   Colab notebook: real weights, SFT, DPO, before/after
 scripts/make_transcripts.py  regenerates results/transcripts.md
-tests/                       160 tests
+tests/                       166 tests
 .github/workflows/ci.yml     tests on 3.10-3.12; runs the full pipeline and
                              fails if the committed results have drifted
 ```

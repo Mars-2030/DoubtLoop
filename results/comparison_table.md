@@ -56,6 +56,24 @@ Lower is better for the first two columns; higher is better for the last two.
 | Final answer cites retrieved evidence | 56.4% |
 | Claims supported by what was retrieved | 100.0% |
 
+## Self-critique vs the evidence (GroundLoop condition)
+
+Whether the critique step agrees with the passages it was shown. If it
+endorses whatever the draft said, retrieval and revision are both wasted.
+
+| Metric | Value |
+|---|---|
+| Claims judged by both | 39 |
+| Agreement with the evidence check | 100.0% |
+| Approved what the evidence does not support | 0.0% |
+| Rejected what the evidence does support | 0.0% |
+| Waved through a draft with a real error | 0.0% |
+
+Agreement with the lexical check, not with ground truth, so
+false approval is an upper bound on the model's error and false alarm a
+lower bound. With the scripted stand-in these are trivially 100% / 0%:
+its critique *is* the lexical check, so it cannot disagree with itself.
+
 ## Reading this table
 
 The middle row is the control that makes the experiment an experiment.
