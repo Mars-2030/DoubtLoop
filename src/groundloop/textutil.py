@@ -311,6 +311,28 @@ def numeric_conflict(claim: str, passage_text: str) -> bool:
     return not claim_nums.issubset(numbers(strip_citations(passage_text)))
 
 
+def numeric_disagreement(claim: str, text: str) -> bool:
+    """True when the claim and the text state *different* numbers, not merely
+    when the text is missing one of the claim's.
+
+    The distinction decides whether a correct answer reads as a hallucination.
+    "The Rosetta Stone was found in 1799 and deciphered in 1822" is exactly
+    right, and the sentence that carries the 1799 says nothing about 1822 -
+    the other sentence of the same passage does. Treating a *missing* number as
+    a disagreement rejects every claim that spans two sentences, which is most
+    of what a model writes when it answers a two-part question.
+
+    A real disagreement needs both sides to commit: each has a number the other
+    does not. "24 hours" against "31 standard hours" qualifies; "1799 and 1822"
+    against "1799" does not.
+    """
+    claim_nums = numbers(strip_citations(claim))
+    text_nums = numbers(strip_citations(text))
+    if not claim_nums or not text_nums:
+        return False
+    return bool(claim_nums - text_nums) and bool(text_nums - claim_nums)
+
+
 def negation_conflict(claim: str, text: str) -> bool:
     """True when exactly one of the two sides is negated.
 
@@ -413,8 +435,8 @@ def check_claim(
         for sent in split_sentences(text):
             if coverage(claim, sent) < tau_contradiction:
                 continue
-            if numeric_conflict(claim, sent):
-                return False, pid, best_cov, "states a number the matching sentence does not"
+            if numeric_disagreement(claim, sent):
+                return False, pid, best_cov, "disagrees numerically with the matching sentence"
             if negation_conflict(claim, sent):
                 return False, pid, best_cov, "polarity disagrees with the matching sentence"
 

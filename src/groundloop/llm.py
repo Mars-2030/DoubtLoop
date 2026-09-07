@@ -190,6 +190,18 @@ class TransformersBackend(LLM):
                 self.model_id, torch_dtype=dtype, device_map=self.device
             )
         if adapter:
+            # peft treats an unresolvable local path as a Hub repo id and fails
+            # forty lines later with a 401. The common cause is that training
+            # never wrote the directory - refused for a tiny dataset, or the
+            # cell was skipped - and that is worth saying in one line.
+            from pathlib import Path as _Path
+
+            if not _Path(adapter).is_dir():
+                raise FileNotFoundError(
+                    f"adapter directory {adapter!r} does not exist. Did the training "
+                    f"step actually run and finish? (A run refused for a too-small "
+                    f"dataset writes nothing.) Drop --adapter to evaluate the base model."
+                )
             from peft import PeftModel
 
             self.model = PeftModel.from_pretrained(self.model, adapter)

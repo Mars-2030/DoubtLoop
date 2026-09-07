@@ -52,7 +52,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--save-trajectories", default=None)
     ap.add_argument("--judge", action="store_true", help="use an LLM judge instead of the lexical check")
     ap.add_argument("--json", action="store_true", help="print metrics as JSON")
-    ap.add_argument("--show-unsupported", type=int, default=0, help="print N unsupported claims")
+    ap.add_argument("--show-unsupported", type=int, default=0,
+                    help="print N unsupported claims with the passage and reason that "
+                         "settled each - the fastest way to tell whether the model is "
+                         "wrong or the scorer is")
     add_backend_args(ap)
     args = ap.parse_args(argv)
 
@@ -95,15 +98,38 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {key:<26} {val}{unit}")
 
     if args.show_unsupported:
-        shown = 0
-        print("\nunsupported claims:")
-        for s in scores:
-            for claim in s.unsupported_claims:
-                print(f"  [{s.example_id}] {claim}")
-                shown += 1
-                if shown >= args.show_unsupported:
-                    return 0
+        _print_unsupported(scores, examples, tool, args.show_unsupported)
     return 0
+
+
+def _print_unsupported(scores, examples, tool, limit: int) -> None:
+    """Claim, closest passage, coverage, and the rule that rejected it.
+
+    A low support rate has two very different causes - the model asserting
+    things the evidence does not say, or the lexical check failing on a
+    legitimate paraphrase - and the aggregate number cannot tell them apart.
+    This can.
+    """
+    from groundloop.textutil import check_claim_default
+
+    by_id = {e["id"]: e for e in examples}
+    shown = 0
+    print("\nunsupported claims, with what the scorer compared them against:")
+    for score in scores:
+        example = by_id.get(score.example_id)
+        if example is None:
+            continue
+        evidence = reference_evidence(example, tool)
+        for claim in score.unsupported_claims:
+            _ok, pid, cov, reason = check_claim_default(claim, evidence)
+            passage = tool.by_id.get(pid)
+            print(f"\n  [{score.example_id}] {claim}")
+            print(f"      reason:   {reason}  (coverage {cov:.2f})")
+            if passage:
+                print(f"      closest:  [{pid}] {passage.text[:150]}...")
+            shown += 1
+            if shown >= limit:
+                return
 
 
 if __name__ == "__main__":

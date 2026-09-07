@@ -57,6 +57,11 @@ def parse_critique(raw: str) -> Critique:
         verdict = str(data.get("verdict", "")).lower()
         if verdict not in ("ok", "revise"):
             verdict = "revise" if any(not c.supported for c in claims) else "ok"
+        elif verdict == "ok" and any(not c.supported for c in claims):
+            # Small models routinely return {"verdict": "ok"} alongside a list of
+            # problems they just found. Believe the findings, not the label: an
+            # unsupported claim is a reason to revise whatever the header says.
+            verdict = "revise"
         return Critique(verdict=verdict, claims=claims, raw=raw)
 
     # Not JSON. Fall back to reading it as prose: any non-empty line that is not

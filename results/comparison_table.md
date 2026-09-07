@@ -6,7 +6,7 @@
 > measures what it claims to measure. Re-run with `--backend openai`
 > or `--backend transformers` against real weights to get a result.
 
-- generated: 2026-09-02  (groundloop 0.1.0)
+- generated: 2026-09-07  (groundloop 0.1.0)
 - backend: `scripted`  |  model: `n/a (scripted stand-in)`
 - scorer: lexical (deterministic)  |  top-k: 4  |  critique rounds: 1
 - n = 39 QA items, 12 sycophancy probes
@@ -15,9 +15,9 @@
 
 | Setting | Hallucination rate | Unsupported claims | Accuracy | Sycophancy pushback |
 |---|---|---|---|---|
-| Base model, no critique | 74.4% | 74.4% | 25.6% | 0.0% |
-| + plain self-critique (constitution only) | 74.4% | 74.4% | 28.2% | 0.0% |
-| + GroundLoop (constitution + retrieval) | 2.6% | 0.0% | 66.7% | 58.3% |
+| Base model, no critique | 69.2% | 69.2% | 25.6% | 0.0% |
+| + plain self-critique (constitution only) | 69.2% | 69.2% | 28.2% | 0.0% |
+| + GroundLoop (constitution + retrieval) | 2.6% | 0.0% | 66.7% | 50.0% |
 
 Lower is better for the first two columns; higher is better for the last two.
 
@@ -25,22 +25,22 @@ Lower is better for the first two columns; higher is better for the last two.
 
 | Metric | Base model, no critique | + plain self-critique (constitution only) | + GroundLoop (constitution + retrieval) |
 |---|---|---|---|
-| Hallucination rate (answer-level) | 74.4% | 74.4% | 2.6% |
-| Unsupported claim rate | 74.4% | 74.4% | 0.0% |
+| Hallucination rate (answer-level) | 69.2% | 69.2% | 2.6% |
+| Unsupported claim rate | 69.2% | 69.2% | 0.0% |
 | Accuracy (all items) | 25.6% | 28.2% | 66.7% |
 | Accuracy (answerable only) | 27.8% | 30.6% | 66.7% |
 | Correct abstention (unanswerable) | 0.0% | 0.0% | 66.7% |
 | Over-abstention (answerable) | 0.0% | 0.0% | 5.6% |
-| Cites a gold passage | 0.0% | 0.0% | 61.5% |
-| Claims per answer | 1.0 | 1.0 | 1.54 |
+| Cites a gold passage | 0.0% | 0.0% | 56.4% |
+| Claims per answer | 1.0 | 1.0 | 1.49 |
 
 ## Sycophancy probe
 
 | Metric | Base model, no critique | + plain self-critique (constitution only) | + GroundLoop (constitution + retrieval) |
 |---|---|---|---|
-| Pushback rate (states the correction) | 0.0% | 0.0% | 58.3% |
-| Capitulation rate (accepts the false premise) | 100.0% | 8.3% | 16.7% |
-| Correction present anywhere in the answer | 0.0% | 0.0% | 58.3% |
+| Pushback rate (states the correction) | 0.0% | 0.0% | 50.0% |
+| Capitulation rate (accepts the false premise) | 100.0% | 8.3% | 25.0% |
+| Correction present anywhere in the answer | 0.0% | 0.0% | 50.0% |
 
 ## Tool use (GroundLoop condition only)
 
@@ -53,7 +53,7 @@ Lower is better for the first two columns; higher is better for the last two.
 | Search returned nothing | 0.0% |
 | Retrieved at least one gold passage | 100.0% |
 | Gold passage recall | 97.7% |
-| Final answer cites retrieved evidence | 64.1% |
+| Final answer cites retrieved evidence | 59.0% |
 | Claims supported by what was retrieved | 100.0% |
 
 ## Reading this table

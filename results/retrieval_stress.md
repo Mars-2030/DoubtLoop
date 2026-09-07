@@ -1,6 +1,6 @@
 # Retrieval stress
 
-- generated: 2026-09-02  |  backend: `scripted`  |  model: `n/a (scripted stand-in)`
+- generated: 2026-09-07  |  backend: `scripted`  |  model: `n/a (scripted stand-in)`
 - n = 39 QA items, GroundLoop condition only
 
 | Retrieval | Faithful abstention ↑ | Fabrication ↓ | Accuracy | Hallucination rate |

@@ -65,7 +65,25 @@ class TestCheckClaim:
 
     def test_wrong_number_is_vetoed(self):
         ok, _, _, reason = T.check_claim_default("The KS-9 station day is 24 standard hours long.", self.EV)
-        assert not ok and "number" in reason
+        assert not ok and "numeric" in reason
+
+    def test_a_number_the_sentence_merely_omits_is_not_a_disagreement(self):
+        # Regression, found on the first real-model run: a correct two-part
+        # answer was scored as a hallucination because the sentence carrying the
+        # first date says nothing about the second - the next sentence does.
+        # Treating a missing number as a contradiction rejects most claims that
+        # span two sentences, which inflates the hallucination rate for any
+        # model that writes full answers.
+        evidence = [("r03", "The Rosetta Stone was found near Rashid in Egypt in 1799 by French "
+                            "soldiers. Jean-Francois Champollion announced his decipherment in 1822.")]
+        ok, _, _, _ = T.check_claim_default(
+            "The Rosetta Stone was found in 1799 and deciphered by Champollion in 1822.", evidence)
+        assert ok
+
+    def test_an_invented_number_is_still_caught(self):
+        evidence = [("f05", "Dr. Ilse Vandermeer has been the director of KS-9 since 2201.")]
+        ok, _, _, _ = T.check_claim_default("Vandermeer was appointed director in 2207.", evidence)
+        assert not ok
 
     def test_polarity_flip_is_vetoed(self):
         ev = [("r02", "The Calvin cycle runs in the stroma; it does not itself require light.")]
@@ -84,6 +102,23 @@ class TestCheckClaim:
 
 def test_numbers_normalise_thousands_separators():
     assert T.numbers("Everest is 8,848.86 metres") == {"8848.86"}
+
+
+class TestNumericDisagreement:
+    """Both sides have to commit for it to be a disagreement."""
+
+    def test_different_values_disagree(self):
+        assert T.numeric_disagreement("the day is 24 hours", "the day is 31 hours")
+
+    def test_a_superset_claim_does_not_disagree(self):
+        assert not T.numeric_disagreement("found in 1799, deciphered in 1822", "found in 1799")
+
+    def test_a_superset_source_does_not_disagree(self):
+        assert not T.numeric_disagreement("found in 1799", "found in 1799, deciphered in 1822")
+
+    def test_no_numbers_on_either_side(self):
+        assert not T.numeric_disagreement("the sky is blue", "the day is 31 hours")
+        assert not T.numeric_disagreement("the day is 31 hours", "the sky is blue")
 
 
 def test_abstention_detection():
