@@ -4,6 +4,8 @@ Both files exist to answer "is the headline an artefact?", so they get tests
 that check the *properties* the answer depends on, not just that they run.
 """
 
+import json
+
 import pytest
 
 from groundloop import config
@@ -148,3 +150,55 @@ class TestResultsDriftCheck:
         normalise = self._normalise()
         assert normalise('{\n  "date": "2026-01-01",\n  "n": 39\n}') == \
                normalise('{\n  "date": "2030-06-06",\n  "n": 39\n}')
+
+
+class TestRescoringWithoutRegenerating:
+    """A change to the scorer is not a change to the model.
+
+    After a metric fix the right move is to re-score the same generations, not
+    to sample new ones and hope the difference was the metric. That also means
+    a half-hour GPU run does not have to be repeated.
+    """
+
+    def test_saved_trajectories_land_under_the_requested_out_dir(self, tmp_path):
+        # Regression: run() wrote to config.RESULTS_DIR/raw regardless of
+        # --out-dir, so a run into results-before/ left its logs in results/.
+        from groundloop.eval import run_all
+
+        run_all.main(["--limit", "3", "--out-dir", str(tmp_path)])
+        assert (tmp_path / "raw" / "qa_base.jsonl").exists()
+        assert (tmp_path / "raw" / "probe_groundloop.jsonl").exists()
+
+    def test_rescoring_reproduces_the_table_without_a_model(self, tmp_path):
+        from groundloop.eval import run_all
+
+        generated, rescored = tmp_path / "gen", tmp_path / "re"
+        run_all.main(["--limit", "4", "--out-dir", str(generated)])
+        run_all.main(["--from-trajectories", str(generated / "raw"), "--out-dir", str(rescored)])
+
+        a = json.loads((generated / "metrics.json").read_text())["conditions"]
+        b = json.loads((rescored / "metrics.json").read_text())["conditions"]
+        assert a == b, "re-scoring the same trajectories changed the numbers"
+
+    def test_a_rescored_table_says_so(self, tmp_path):
+        from groundloop.eval import run_all
+
+        generated, rescored = tmp_path / "gen", tmp_path / "re"
+        run_all.main(["--limit", "3", "--out-dir", str(generated)])
+        run_all.main(["--from-trajectories", str(generated / "raw"), "--out-dir", str(rescored)])
+        table = (rescored / "comparison_table.md").read_text()
+        assert "Re-scored from saved trajectories" in table
+        # It must not silently inherit this run's backend as provenance.
+        assert "n/a (scripted stand-in)" not in table
+
+    def test_a_missing_directory_is_explained(self, tmp_path):
+        from groundloop.eval import run_all
+
+        with pytest.raises(SystemExit, match="--from-trajectories expects"):
+            run_all.main(["--from-trajectories", str(tmp_path / "nope"), "--out-dir", str(tmp_path)])
+
+    def test_retrieval_stress_keeps_its_trajectories_by_default(self, tmp_path):
+        from groundloop.eval import retrieval_stress
+
+        retrieval_stress.main(["--modes", "normal", "--limit", "3", "--out-dir", str(tmp_path)])
+        assert (tmp_path / "raw" / "stress_normal.jsonl").exists()

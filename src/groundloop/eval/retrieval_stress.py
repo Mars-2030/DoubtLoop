@@ -190,7 +190,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("-k", type=int, default=config.TOP_K)
     ap.add_argument("--out-dir", default=None)
-    ap.add_argument("--save-trajectories", action="store_true")
+    # On by default: a metric change means re-scoring, and re-scoring needs the
+    # generations. Regenerating them costs GPU minutes; keeping them costs a file.
+    ap.add_argument("--save-trajectories", action="store_true", default=True)
+    ap.add_argument("--no-save-trajectories", dest="save_trajectories", action="store_false")
     ap.add_argument("--json", action="store_true")
     add_backend_args(ap)
     args = ap.parse_args(argv)

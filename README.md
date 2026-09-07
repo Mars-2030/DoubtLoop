@@ -141,7 +141,7 @@ standard-library Python.
 pip install -e .   # only needed to run `python -m groundloop...` directly;
                    # the `make` targets set PYTHONPATH themselves
 
-make test     # 134 tests, no GPU, no network, ~1s
+make test     # 139 tests, no GPU, no network, ~1s
 make smoke    # one question through all three conditions
 make eval     # regenerate results/comparison_table.md
 make results  # every table and transcript: ablation, stress, sensitivity
@@ -237,7 +237,11 @@ condition and not from three slightly different harnesses.
   or with search returning nothing. Measures whether the model abstains when
   its evidence cannot support an answer, or keeps answering with citations.
 - `sensitivity` — the threshold and `k` sweeps above.
-- `run_all` — the three-way ablation, into `results/`.
+- `run_all` — the three-way ablation, into `results/`. Every trajectory is saved
+  under `<out-dir>/raw/`, and `--from-trajectories <dir>` re-scores a previous run
+  instead of regenerating it. Use that after any change to the scorer: the
+  generations are unaffected, so sampling new ones only adds noise (and, against a
+  real model, half an hour of GPU time).
 
 **One rule holds the comparison together: all three conditions are scored
 against the same evidence pool** (gold support ∪ oracle retrieval for the
@@ -322,7 +326,7 @@ src/groundloop/
 demo/app.py                  Gradio, or --cli; runs with no training
 notebooks/                   Colab notebook: real weights, SFT, DPO, before/after
 scripts/make_transcripts.py  regenerates results/transcripts.md
-tests/                       134 tests
+tests/                       139 tests
 .github/workflows/ci.yml     tests on 3.10-3.12; runs the full pipeline and
                              fails if the committed results have drifted
 ```

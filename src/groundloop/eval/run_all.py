@@ -21,7 +21,7 @@ from datetime import date
 from pathlib import Path
 
 from groundloop import __version__, config
-from groundloop.datasets import load_qa, load_sycophancy, write_jsonl
+from groundloop.datasets import load_qa, load_sycophancy, read_jsonl, write_jsonl
 from groundloop.eval import hallucination_rate as hall
 from groundloop.eval import sycophancy_probe as syco
 from groundloop.eval import tool_use_quality as tools_eval
@@ -36,6 +36,15 @@ CONDITION_LABELS = {
 }
 
 
+def _require(path: Path) -> Path:
+    if not path.exists():
+        raise SystemExit(
+            f"{path} not found. --from-trajectories expects the raw/ directory that a "
+            f"previous run wrote (qa_<condition>.jsonl and probe_<condition>.jsonl)."
+        )
+    return path
+
+
 def _progress(label: str):
     def tick(i: int, n: int) -> None:
         print(f"\r  {label}: {i}/{n}   ", end="", file=sys.stderr, flush=True)
@@ -43,29 +52,45 @@ def _progress(label: str):
     return tick
 
 
-def run(args) -> dict:
-    llm = backend_from_args(args)
+def run(args, out_dir: Path) -> dict:
+    """Generate (or re-load) the trajectories for all three conditions and score them.
+
+    `--from-trajectories` re-scores a previous run instead of regenerating it.
+    That path exists because a change to the *scorer* is not a change to the
+    *model*: after a metric fix, the honest thing is to re-score the same
+    generations, not to sample new ones and hope the difference was the metric.
+    It also happens to save the half-hour of GPU time.
+    """
     tool = SearchTool()
     qa = load_qa(limit=args.limit)
     probe = load_sycophancy(limit=args.limit)
 
     results: dict[str, dict] = {}
-    raw_dir = config.RESULTS_DIR / "raw"
+    raw_dir = out_dir / "raw"
+    replay = Path(args.from_trajectories) if args.from_trajectories else None
+    llm = None if replay else backend_from_args(args)
 
     for condition in CONDITIONS:
-        qa_trajs = [
-            t.to_json()
-            for t in run_dataset(llm, qa, condition, tool=tool, k=args.k,
-                                 rounds=args.rounds, progress=_progress(f"qa/{condition}"))
-        ]
-        probe_trajs = [
-            t.to_json()
-            for t in run_dataset(llm, probe, condition, tool=tool, k=args.k,
-                                 rounds=args.rounds, progress=_progress(f"probe/{condition}"))
-        ]
-        if args.save_trajectories:
-            write_jsonl(raw_dir / f"qa_{condition}.jsonl", qa_trajs)
-            write_jsonl(raw_dir / f"probe_{condition}.jsonl", probe_trajs)
+        if replay:
+            qa_trajs = read_jsonl(_require(replay / f"qa_{condition}.jsonl"))
+            probe_path = replay / f"probe_{condition}.jsonl"
+            probe_trajs = read_jsonl(probe_path) if probe_path.exists() else []
+            qa = [e for e in qa if e["id"] in {t["example_id"] for t in qa_trajs}]
+            probe = [e for e in probe if e["id"] in {t["example_id"] for t in probe_trajs}]
+        else:
+            qa_trajs = [
+                t.to_json()
+                for t in run_dataset(llm, qa, condition, tool=tool, k=args.k,
+                                     rounds=args.rounds, progress=_progress(f"qa/{condition}"))
+            ]
+            probe_trajs = [
+                t.to_json()
+                for t in run_dataset(llm, probe, condition, tool=tool, k=args.k,
+                                     rounds=args.rounds, progress=_progress(f"probe/{condition}"))
+            ]
+            if args.save_trajectories:
+                write_jsonl(raw_dir / f"qa_{condition}.jsonl", qa_trajs)
+                write_jsonl(raw_dir / f"probe_{condition}.jsonl", probe_trajs)
 
         _, qa_summary = hall.score_trajectories(qa_trajs, qa, tool)
         _, probe_summary = syco.score_trajectories(probe_trajs, probe)
@@ -74,13 +99,19 @@ def run(args) -> dict:
             entry["tool_use"] = tools_eval.score_trajectories(qa_trajs, qa)
         results[condition] = entry
 
-    print(file=sys.stderr)
+    if not replay:
+        print(file=sys.stderr)
     return {
         "meta": {
             "groundloop_version": __version__,
             "date": date.today().isoformat(),
-            "backend": args.backend,
-            "model": args.model or ("n/a (scripted stand-in)" if args.backend == "scripted" else "default"),
+            "backend": "re-scored" if args.from_trajectories else args.backend,
+            "source": f"re-scored from {args.from_trajectories}" if args.from_trajectories else "generated",
+            "model": (
+                args.model
+                or ("as recorded in the original run" if args.from_trajectories else None)
+                or ("n/a (scripted stand-in)" if args.backend == "scripted" else "default")
+            ),
             "scorer": "lexical (deterministic)",
             "k": args.k,
             "rounds": args.rounds,
@@ -101,8 +132,16 @@ def render_markdown(payload: dict) -> str:
     meta = payload["meta"]
     conds = payload["conditions"]
     scripted = meta["backend"] == "scripted"
+    replayed = meta.get("source", "generated") != "generated"
 
     lines = ["# GroundLoop: three-way comparison", ""]
+    if replayed:
+        lines += [
+            "> Re-scored from saved trajectories, not regenerated. The generations are",
+            "> whatever the original run produced - check that run for which model and",
+            "> backend made them. Only the scoring is from this version of the code.",
+            "",
+        ]
     if scripted:
         lines += [
             "> **These numbers are not a model result.** They were produced with",
@@ -114,7 +153,8 @@ def render_markdown(payload: dict) -> str:
         ]
     lines += [
         f"- generated: {meta['date']}  (groundloop {meta['groundloop_version']})",
-        f"- backend: `{meta['backend']}`  |  model: `{meta['model']}`",
+        f"- backend: `{meta['backend']}`  |  model: `{meta['model']}`"
+        + (f"  |  {meta['source']}" if meta.get("source", "generated") != "generated" else ""),
         f"- scorer: {meta['scorer']}  |  top-k: {meta['k']}  |  critique rounds: {meta['rounds']}",
         f"- n = {meta['n_qa']} QA items, {meta['n_probe']} sycophancy probes",
         "",
@@ -211,6 +251,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("-k", type=int, default=config.TOP_K)
     ap.add_argument("--rounds", type=int, default=1)
     ap.add_argument("--out-dir", default=None)
+    ap.add_argument("--from-trajectories", default=None, metavar="DIR",
+                    help="re-score a previous run's raw/ directory instead of "
+                         "regenerating it. Use this after a change to the scorer: the "
+                         "generations are unaffected, so sampling new ones only adds noise.")
     ap.add_argument("--save-trajectories", action="store_true", default=True)
     ap.add_argument("--no-save-trajectories", dest="save_trajectories", action="store_false")
     add_backend_args(ap)
@@ -219,7 +263,7 @@ def main(argv: list[str] | None = None) -> int:
     out_dir = config.RESULTS_DIR if args.out_dir is None else Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    payload = run(args)
+    payload = run(args, out_dir)
     (out_dir / "metrics.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     table = render_markdown(payload)
     (out_dir / "comparison_table.md").write_text(table, encoding="utf-8")
