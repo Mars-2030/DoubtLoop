@@ -354,19 +354,56 @@ def _polarity_veto(claim: str, text: str, floor: float = 0.5) -> bool:
     that actually match the claim keeps the veto from firing on some unrelated
     negation elsewhere in the evidence.
     """
-    for sent in split_sentences(text):
-        if coverage(claim, sent) >= floor and negation_conflict(claim, sent):
+    for unit in split_clauses(text):
+        if coverage(claim, unit) >= floor and negation_conflict(claim, unit):
             return True
     return False
 
 
+_CLAUSE_BREAK = re.compile(
+    r";|,\s+(?=(?:and|but|or|nor|yet|so|while|whereas|although|though|which|who|"
+    r"using|it|they|this|that|these|those)\b)",
+    re.IGNORECASE,
+)
+
+
+def split_clauses(text: str) -> list[str]:
+    """Sentences, and the clauses within them.
+
+    Polarity has to be judged against the part of the sentence that carries the
+    match, not the whole sentence. "The Calvin cycle then runs in the stroma,
+    using that ATP and NADPH to fix carbon dioxide into sugars; it does not
+    itself require light" supports "the Calvin cycle runs in the stroma of the
+    chloroplast" outright - but the sentence contains a negation about a
+    different clause, and a sentence-level polarity check reads that as a
+    contradiction and rejects a correct claim.
+
+    Both granularities are returned. Coverage is the fraction of the *claim*
+    covered, so a shorter unit is harder to satisfy, not easier: adding clauses
+    can only help a claim that genuinely lines up with one.
+    """
+    units = []
+    for sent in split_sentences(text):
+        units.append(sent)
+        clauses = [c.strip() for c in _CLAUSE_BREAK.split(sent) if c and c.strip()]
+        if len(clauses) > 1:
+            units.extend(clauses)
+    return units
+
+
 def _best_sentence(claim: str, passage_text: str):
-    best_cov, best_sent = 0.0, ""
-    for sent in split_sentences(passage_text):
-        cov = coverage(claim, sent)
-        if cov > best_cov:
-            best_cov, best_sent = cov, sent
-    return best_cov, best_sent
+    """Best-covering unit of the passage, preferring the most specific one.
+
+    Ties go to the shorter unit: if a clause covers the claim as well as the
+    sentence containing it, the clause is what the claim is actually about, and
+    it is the right thing to check polarity and numbers against.
+    """
+    best_cov, best_unit = 0.0, ""
+    for unit in split_clauses(passage_text):
+        cov = coverage(claim, unit)
+        if cov > best_cov or (cov == best_cov and best_unit and len(unit) < len(best_unit)):
+            best_cov, best_unit = cov, unit
+    return best_cov, best_unit
 
 
 def check_claim(
@@ -432,7 +469,7 @@ def check_claim(
     # the 31-hour day" covers most of "the station day is 31 standard hours" and
     # mentions no KS-9, so on its own it reads as a numeric disagreement.
     for pid, text in items:
-        for sent in split_sentences(text):
+        for sent in split_clauses(text):
             if coverage(claim, sent) < tau_contradiction:
                 continue
             if numeric_disagreement(claim, sent):

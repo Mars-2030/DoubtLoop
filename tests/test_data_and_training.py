@@ -228,15 +228,24 @@ class TestRejectionDiagnostics:
             "probe: revision never states the correction": 12}})
         assert "model-capability" in out
 
-    def test_rendering_flags_a_revision_that_never_revised(self):
+    def test_an_unchanged_answer_names_which_stage_failed(self):
+        # "final == draft" has two causes needing opposite responses: the
+        # critique found nothing to act on, or a revision ran and came back
+        # unchanged. The note has to say which.
         from groundloop.data_gen.build_trajectories import render_rejected
 
-        out = render_rejected([{
-            "id": "s01", "reason": "probe: revision never states the correction",
-            "question": "Q?", "draft": "same text", "revision": "same text",
-            "unsupported": [], "evidence": ["r20"],
-        }], 5)
-        assert "identical to the draft" in out and "did not revise" in out
+        base = {"id": "s01", "reason": "probe: revision never states the correction",
+                "question": "Q?", "draft": "same text", "revision": "same text",
+                "unsupported": [], "evidence": ["r20"]}
+
+        critique_failed = render_rejected([{**base, "revision_attempted": False,
+                                            "critique_verdict": "ok", "critique_issues": 0}], 5)
+        assert "no revision attempted" in critique_failed and "critique failure" in critique_failed
+
+        generation_failed = render_rejected([{**base, "revision_attempted": True,
+                                              "critique_verdict": "revise", "critique_issues": 2}], 5)
+        assert "came back unchanged" in generation_failed
+        assert "generation failure" in generation_failed
 
     def test_rendering_shows_the_unsupported_claims(self):
         from groundloop.data_gen.build_trajectories import render_rejected

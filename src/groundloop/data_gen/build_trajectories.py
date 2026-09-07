@@ -237,6 +237,9 @@ def build(args) -> dict:
                 "revision": traj.final,
                 "unsupported": list(getattr(after, "unsupported_claims", []))[:3],
                 "evidence": [p.id for p in traj.evidence],
+                "revision_attempted": traj.meta.get("revision_attempted", False),
+                "critique_verdict": traj.meta.get("critique_verdict", ""),
+                "critique_issues": traj.meta.get("critique_issues", 0),
             })
             continue
         sft_rows.append(to_sft_record(traj, args.style))
@@ -279,7 +282,14 @@ def render_rejected(rejected: list[dict], limit: int) -> str:
         for claim in row["unsupported"]:
             lines.append(f"    unsupported: {claim[:160]}")
         if row["draft"].strip() == row["revision"].strip():
-            lines.append("    NOTE: the revision is identical to the draft - the model did not revise")
+            if row.get("revision_attempted"):
+                lines.append("    NOTE: a revision was attempted and came back unchanged (or empty) "
+                             "- generation failure")
+            else:
+                lines.append(f"    NOTE: no revision attempted - the critique returned "
+                             f"{row.get('critique_verdict', '?')!r} with "
+                             f"{row.get('critique_issues', 0)} issue(s), so the loop had nothing "
+                             f"to act on - critique failure")
     return "\n".join(lines)
 
 

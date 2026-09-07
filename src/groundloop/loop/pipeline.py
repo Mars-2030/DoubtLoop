@@ -106,6 +106,12 @@ def run_condition(
         return traj
 
     grounded = condition == "groundloop"
+    # Two very different reasons a final answer can equal the draft: the critique
+    # found nothing to fix, so no revision was ever attempted; or one was
+    # attempted and came back unchanged (or empty, which falls back to the
+    # draft). The first is a critique failure, the second a generation failure,
+    # and they need opposite responses - so record which happened.
+    traj.meta["revision_attempted"] = False
     current = traj.draft
     for _ in range(max(1, rounds)):
         evidence: list[Passage] = []
@@ -127,6 +133,7 @@ def run_condition(
         if crit.verdict == "ok" and not crit.unsupported:
             traj.revision = current
             break
+        traj.meta["revision_attempted"] = True
         current = revise_stage(
             llm, question, current, critique_mod.render(crit),
             evidence=evidence, evidence_block=evidence_block, grounded=grounded,
@@ -135,6 +142,9 @@ def run_condition(
 
     traj.meta["elapsed_s"] = round(time.time() - started, 3)
     traj.meta["gold_support"] = example.get("support", [])
+    if traj.critique is not None:
+        traj.meta["critique_verdict"] = traj.critique.verdict
+        traj.meta["critique_issues"] = len(traj.critique.unsupported)
     return traj
 
 
