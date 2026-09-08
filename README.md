@@ -16,9 +16,9 @@ GroundLoop changes one step. During critique the model calls a retrieval tool,
 puts real passages next to its draft, and revises against those. The claim under
 test is narrow and falsifiable: **the faithfulness gain comes from checking a
 source, not from thinking harder.** The repo is built to measure exactly that
-gap, and on Qwen3-0.6B it measures it — the thinking-harder gap is empty, the
-checking-a-source gap is real, and the ceiling on both is the model's
-willingness to fail its own draft.
+gap. Measured across two model sizes, the thinking-harder gap is not merely
+empty but negative, the checking-a-source gap is large, and the thing that
+gates it is whether the model will fail its own draft.
 
 ```
 question ──▶ draft ──▶ extract claims ──▶ search(query)   [tool call]
@@ -37,72 +37,80 @@ question ──▶ draft ──▶ extract claims ──▶ search(query)   [too
 
 ## The result
 
-**Qwen3-0.6B, 39 QA items and 12 sycophancy probes, frozen weights.** All three
-conditions are inference-time scaffolding over the same stock model — one call
-for the base condition, three for plain self-critique, five plus a retrieval
-call for GroundLoop. Nothing is fine-tuned.
+**Two model sizes, 39 QA items and 12 sycophancy probes, frozen weights.** Every
+condition is inference-time scaffolding over the same stock model — one call for
+the base condition, three for plain self-critique, five plus a retrieval call for
+GroundLoop. Nothing is fine-tuned.
 
-| Setting | Hallucination rate ↓ | Unsupported claims ↓ | Accuracy ↑ | Cites a source ↑ | Sycophancy pushback ↑ |
-|---|---|---|---|---|---|
-| Base model, no critique | 87.2% | 87.5% | 10.3% | 0% | 8.3% |
-| + plain self-critique (constitution only) | 89.7% | 88.9% | 10.3% | 0% | 8.3% |
-| + GroundLoop (constitution + retrieval) | 84.6% | **74.1%** | **28.2%** | **30.8%** | **25.0%** |
+| | Base | Plain self-critique | GroundLoop |
+|---|---|---|---|
+| **Qwen3-0.6B** accuracy | 10.3% | 10.3% | **28.2%** |
+| **Qwen3-1.7B** accuracy | 30.8% | 25.6% | **64.1%** (p=0.0002) |
+| **Qwen3-0.6B** unsupported claims | 87.5% | 88.9% | **74.1%** |
+| **Qwen3-1.7B** unsupported claims | 89.9% | 93.0% | **50.7%** |
+| **Qwen3-1.7B** sycophancy pushback | 25.0% | 25.0% | **83.3%** |
 
-Three things to read out of it.
+Three findings, in order of how much they matter.
 
-**The control did its job.** Plain self-critique is *worse* than not critiquing
-at all — 89.7% against 87.2%, with accuracy flat. A model reasoning harder about
-its own answer, with a constitution and no evidence, added nothing and cost a
-little. That is the gap the whole project is about, and it is empty.
+### 1. The method has a size at which it turns on
 
-**Retrieval buys accuracy, not clean answers.** Accuracy nearly triples and
-claim-level grounding improves by 13 points, but *answer-level* hallucination
-barely moves — 87.2% to 84.6%. At 1.38 claims per answer a single bad claim
-condemns the whole answer, so GroundLoop makes answers better without making
-them clean.
+| | Well-formed tool call | Gold passage recall | **Critique false approval** |
+|---|---|---|---|
+| Qwen3-0.6B | 100% | 100% | **53.3%** |
+| Qwen3-1.7B | 100% | 100% | **0.0%** |
 
-**Size the effect before believing it.** Accuracy going 10.3% → 28.2% is four
-items out of 39 becoming eleven, and the bootstrap interval on 28.2% runs from
-roughly 15% to 44%. Seven items flipping the right way is a real effect on a
-paired test (p ≈ 0.02 if none regressed); one item of movement in answer-level
-hallucination is not. The comparison table now prints McNemar's exact test and
-bootstrap intervals for exactly this reason — `make eval-model` populates them.
+Retrieval is saturated at *both* sizes — even 0.6B calls the tool correctly every
+time and gets the gold passage every time — so retrieval explains none of the
+difference between them. What changes is the critique. At 0.6B the model approves
+53% of the claims the evidence does not support, naming a passage while doing it.
+At 1.7B it approves none of them.
 
-## Where it breaks: the critique step
+That is not the degenerate case of rejecting everything: of 38 claims judged at
+1.7B, 32 agreed with the evidence check, and all six disagreements were the model
+being *more* cautious than the checker. **The bottleneck in retrieval-grounded
+self-critique is neither retrieval nor revision — it is whether the model will
+fail its own draft, and that capability arrives somewhere between 0.6B and 1.7B.**
 
-Retrieval is not the bottleneck. In that run the model issued a well-formed
-`search` call on **100%** of questions and the gold passage came back **100%** of
-the time. The right passage is in the context window every single time.
+### 2. Self-critique without evidence hurts, and hurts more with scale
 
-What happens next is the finding:
+| | Base | Plain self-critique |
+|---|---|---|
+| Qwen3-0.6B hallucination | 87.2% | 89.7% (+2.5) |
+| Qwen3-1.7B hallucination | 87.2% | 92.3% (+5.1) |
+| Qwen3-1.7B accuracy | 30.8% | 25.6% (−5.2) |
 
-| Self-critique vs the evidence it was shown | |
-|---|---|
-| Claims judged by both the model and the evidence check | 45 |
-| Agreement | 42.2% |
-| **Approved what the evidence does not support** | **53.3%** |
-| Rejected what the evidence does support | 4.4% |
-| Waved through a draft containing a real error | 52.9% |
+The control condition does not merely fail to help. A more capable model asked to
+audit its own answer with nothing to check it against writes a more convincing
+wrong critique and talks itself into a worse revision. This is the failure mode
+the project was built to demonstrate, and it shows up in the column that exists
+to be the null result.
 
-The failure is not noise, it is a *bias toward approval*. The model almost never
-wrongly rejects a good claim (4.4%) and approves more than half the bad ones —
-naming a passage id while doing it. A worked case from the run: the draft said
-"During Apollo 11, the crew of the spacecraft stayed in lunar orbit instead of
-walking on the surface", and the critique returned
-`{"status": "supported", "passage": "r01"}` — where r01 says plainly that
-Armstrong and Aldrin walked while Collins stayed.
+### 3. Neither size ever abstains
 
-Constitutional AI treats the critique step as roughly free. At 0.6B it is the
-binding constraint: the evidence is retrieved, delivered, and then waved
-through. That is what caps the answer-level hallucination rate, and it is why
-the loop cannot generate enough good self-revisions to bootstrap its own
-training data (17% yield; see **Status** below).
+Correct abstention on unanswerable questions is **0.0% at both sizes**. Neither
+model says "the corpus does not answer this", whatever principle P5 asks and
+whatever the prompt says. Scale did not touch it. That is the clearest open
+problem this work leaves.
 
-These numbers are transcribed from a Colab run — see
-[`results/qwen3-0.6b.md`](results/qwen3-0.6b.md) for the full table and the
-command that reproduces it. The machine-generated tables committed under
-`results/` come from the scripted stand-in and are a harness demonstration, not
-a model result; they say so in their own headers.
+Full tables: [`results/model_comparison.md`](results/model_comparison.md),
+[`results/qwen3-0.6b.md`](results/qwen3-0.6b.md),
+[`results/qwen3-1.7b.md`](results/qwen3-1.7b.md).
+
+### Sizing the effects honestly
+
+At n=39 a ratio can be a handful of examples, so the comparison table prints
+McNemar's exact test on the paired per-item outcomes and bootstrap intervals on
+every rate. At 1.7B, accuracy is 13 items better and 0 worse (p=0.0002) and
+pushback 7 better / 0 worse (p=0.0156) — results. Answer-level hallucination
+against the base condition is 4 better / 0 worse (p=0.125) — a direction.
+
+Answer-level hallucination also *understates* GroundLoop at 1.7B. It counts an
+answer as hallucinated if any single claim is unsupported, and GroundLoop answers
+there carry 3.59 claims against the base condition's 1.77, because the model
+quotes and cites far more. If claims failed independently, that longer answer
+would be *less* likely to come out clean despite the better per-claim rate. It
+improves anyway, which says the failures are correlated. The per-claim rate is
+the fair cross-size comparison, and it nearly halves: 89.9% → 50.7%.
 
 ### Does the result survive scrutiny?
 
@@ -349,12 +357,14 @@ plausible falsehood. That needs a conflicting-evidence corpus slice and a
 constitution principle about what to do when sources disagree, and neither
 exists yet.
 
-**One model, one corpus, one seed.** Everything here is Qwen3-0.6B on 44
-hand-written passages. Whether the 53% false-approval rate is a property of this
-size, this model, or this critique prompt is untested, and the single-model table
-cannot separate those. `scripts/compare_models.py` puts several runs side by
-side with retrieval and critique quality next to the outcome metrics, precisely
-because the outcome alone cannot tell you which explanation you are looking at:
+**Two sizes of one model family, one corpus, one seed.** Everything here is
+Qwen3 on 44 hand-written passages. The 0.6B → 1.7B jump shows false approval
+collapsing while retrieval stays saturated, which is the pattern that separates
+"model capacity" from "bad critique prompt" — but two points do not make a curve,
+and nothing here says whether the same holds for another model family.
+`scripts/compare_models.py` puts runs side by side with retrieval and critique
+quality next to the outcome metrics, because the outcome alone cannot tell you
+which explanation you are looking at:
 
 ```bash
 python -m groundloop.eval.run_all --backend transformers --model Qwen/Qwen3-1.7B \
@@ -404,8 +414,9 @@ src/groundloop/
   eval/                      metrics, stress, sensitivity, run_all
 demo/app.py                  Gradio, or --cli; runs with no training
 notebooks/                   Colab notebook: real weights, SFT, DPO, before/after
-results/qwen3-0.6b.md        the real-weights result; the rest of results/ is
-                             the scripted harness demonstration
+results/model_comparison.md  0.6B vs 1.7B: where the method turns on
+results/qwen3-*.md           per-model real-weights results; the generated
+                             files beside them are the scripted harness demo
 scripts/make_transcripts.py  regenerates results/transcripts.md
 tests/                       176 tests
 .github/workflows/ci.yml     tests on 3.10-3.12; runs the full pipeline and
@@ -423,7 +434,7 @@ survive at 270M?); Qwen3.5-2B is the headroom option.
 
 ## Status: what has and has not been tested
 
-**Tested, on real weights (Qwen3-0.6B).** The three conditions are *inference-time
+**Tested, on real weights (Qwen3-0.6B and Qwen3-1.7B).** The three conditions are *inference-time
 scaffolding* over frozen weights — no parameters are changed by any of them. One
 model call for the base condition, three for plain self-critique, five plus a
 retrieval call for GroundLoop. The ablation, the retrieval stress modes, the
@@ -432,8 +443,9 @@ Phase 4 produced real trajectories and preference pairs.
 
 So the result answers one question: **does wrapping a small model in a
 retrieval-grounded critique loop make it more honest at inference time?** On this
-corpus, yes — accuracy roughly triples and the gain is significant under a paired
-test — with the critique step as the binding constraint.
+corpus, yes at both sizes and decisively at 1.7B (accuracy 30.8% → 64.1%,
+p=0.0002), with the critique step as the binding constraint and the constraint
+lifting between 0.6B and 1.7B.
 
 **Not tested: whether the behaviour can be put into the weights.** Phase 5 (LoRA
 SFT, then DPO) is written and dry-run tested but has never trained against real
@@ -443,8 +455,10 @@ retriever holding it up. Until it runs, this repository contains an
 inference-time method and the harness that measures it, and the "aligned" in the
 project description is an aim rather than a claim.
 
-The reason Phase 5 has not run is now measured rather than assumed: at 17% yield
-the model produces roughly nine usable self-revisions from 51 examples, which is
-memorisation rather than training. Generating that data with a larger model would
-clear the volume problem and make it distillation rather than self-improvement —
-a different claim, and one the write-up would have to state.
+The reason Phase 5 has not run is now measured rather than assumed: at 0.6B the
+loop yields 17%, roughly nine usable self-revisions from 51 examples, which is
+memorisation rather than training. The 1.7B result changes the arithmetic — with
+0% critique false approval and 50.7% unsupported claims it should clear the
+filter far more often, so **re-running data generation at 1.7B is the obvious
+next step**, and it would be self-improvement rather than distillation if the
+1.7B model is also the one being trained.
