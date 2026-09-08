@@ -93,3 +93,75 @@ def test_low_yield_is_explained_before_training(nb):
     prose = "".join("".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "markdown")
     assert "yield" in prose.lower()
     assert "--no-require-correct" in prose and "--tau" in prose
+
+
+class TestModelComparison:
+    """Comparing models is the experiment that turns one table into a claim
+    about where the method starts working - so it must not silently compare
+    runs that are not comparable."""
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        from pathlib import Path
+
+        path = Path(__file__).resolve().parents[1] / "scripts" / "compare_models.py"
+        spec = importlib.util.spec_from_file_location("compare_models", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    @staticmethod
+    def _metrics(model, n, base_acc, ground_acc, false_approval):
+        return {
+            "meta": {"model": model, "backend": "transformers", "n_qa": n},
+            "conditions": {
+                "base": {"qa": {"accuracy": base_acc, "unsupported_claim_rate": 90.0},
+                         "sycophancy": {"pushback_rate": 8.3}},
+                "plain_critique": {"qa": {"accuracy": base_acc},
+                                   "sycophancy": {"pushback_rate": 8.3}},
+                "groundloop": {
+                    "qa": {"accuracy": ground_acc, "unsupported_claim_rate": 74.0},
+                    "sycophancy": {"pushback_rate": 25.0},
+                    "tool_use": {"well_formed_call_rate": 100.0, "gold_passage_recall": 100.0},
+                    "critique": {"false_approval_rate": false_approval, "blind_critique_rate": 52.9},
+                },
+            },
+            "significance": [{"attribute": "correct", "vs_base": {"p_value": 0.016}}],
+        }
+
+    def test_rows_carry_the_numbers_that_explain_the_outcome(self, tmp_path):
+        mod = self._module()
+        import json
+
+        path = tmp_path / "metrics.json"
+        path.write_text(json.dumps(self._metrics("Qwen/Qwen3-0.6B", 39, 10.3, 28.2, 53.3)))
+        table = mod.render([mod.load(path)])
+        assert "10.3% → 28.2%" in table
+        assert "53.3%" in table, "false approval is the column the experiment turns on"
+        assert "100.0%" in table, "retrieval has to be visible to rule it out"
+
+    def test_mismatched_question_sets_are_flagged(self, tmp_path):
+        mod = self._module()
+        import json
+
+        a, b = tmp_path / "a.json", tmp_path / "b.json"
+        a.write_text(json.dumps(self._metrics("small", 39, 10.3, 28.2, 53.3)))
+        b.write_text(json.dumps(self._metrics("large", 12, 20.0, 50.0, 20.0)))
+        table = mod.render([mod.load(a), mod.load(b)])
+        assert "not comparable" in table
+
+    def test_matching_question_sets_are_not_flagged(self, tmp_path):
+        mod = self._module()
+        import json
+
+        a, b = tmp_path / "a.json", tmp_path / "b.json"
+        a.write_text(json.dumps(self._metrics("small", 39, 10.3, 28.2, 53.3)))
+        b.write_text(json.dumps(self._metrics("large", 39, 20.0, 50.0, 20.0)))
+        assert "not comparable" not in mod.render([mod.load(a), mod.load(b)])
+
+    def test_a_missing_file_is_explained(self, tmp_path):
+        mod = self._module()
+
+        with pytest.raises(SystemExit, match="not found"):
+            mod.main([str(tmp_path / "nope.json")])

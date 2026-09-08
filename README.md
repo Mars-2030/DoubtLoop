@@ -174,7 +174,7 @@ standard-library Python.
 pip install -e .   # only needed to run `python -m groundloop...` directly;
                    # the `make` targets set PYTHONPATH themselves
 
-make test     # 172 tests, no GPU, no network, ~1s
+make test     # 176 tests, no GPU, no network, ~1s
 make smoke    # one question through all three conditions
 make eval     # regenerate results/comparison_table.md
 make results  # every table and transcript: ablation, stress, sensitivity
@@ -351,10 +351,21 @@ exists yet.
 
 **One model, one corpus, one seed.** Everything here is Qwen3-0.6B on 44
 hand-written passages. Whether the 53% false-approval rate is a property of this
-size, this model, or this critique prompt is untested — the obvious next
-experiment is the same ablation at 1.7B and 4B, because a false-approval rate
-that falls with scale while retrieval stays pinned at 100% would say *where* the
-method starts working, which is a stronger claim than any single model's table.
+size, this model, or this critique prompt is untested, and the single-model table
+cannot separate those. `scripts/compare_models.py` puts several runs side by
+side with retrieval and critique quality next to the outcome metrics, precisely
+because the outcome alone cannot tell you which explanation you are looking at:
+
+```bash
+python -m groundloop.eval.run_all --backend transformers --model Qwen/Qwen3-1.7B \
+    --dtype float16 --out-dir results-1.7b
+make compare RUNS="results-0.6b/metrics.json results-1.7b/metrics.json"
+```
+
+False approval falling with scale while retrieval stays pinned at 100% would say
+*where* the method starts working. Staying flat would say the critique prompt is
+the problem and scale is the wrong lever. Either is a stronger claim than one
+model's numbers.
 
 **The scorer had four bugs, all in the same direction.** Every one was found by
 reading individual rejected claims rather than aggregates, and every one was the
@@ -396,7 +407,7 @@ notebooks/                   Colab notebook: real weights, SFT, DPO, before/afte
 results/qwen3-0.6b.md        the real-weights result; the rest of results/ is
                              the scripted harness demonstration
 scripts/make_transcripts.py  regenerates results/transcripts.md
-tests/                       172 tests
+tests/                       176 tests
 .github/workflows/ci.yml     tests on 3.10-3.12; runs the full pipeline and
                              fails if the committed results have drifted
 ```

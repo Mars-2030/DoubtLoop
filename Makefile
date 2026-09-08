@@ -2,7 +2,7 @@ PYTHON ?= python3
 export PYTHONPATH := src
 
 .DEFAULT_GOAL := help
-.PHONY: help test smoke eval eval-model stress sensitivity results check-results demo data sft dpo search clean
+.PHONY: help test smoke eval eval-model stress sensitivity results check-results compare demo data sft dpo search clean
 
 help:  ## show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -30,6 +30,9 @@ results: eval stress sensitivity  ## regenerate every table and transcript in re
 
 check-results:  ## fail if committed results/ differs from a fresh run
 	$(PYTHON) scripts/check_results_drift.py
+
+compare:  ## across models: make compare RUNS="a/metrics.json b/metrics.json"
+	$(PYTHON) scripts/compare_models.py $(RUNS) --out results/model_comparison.md
 
 demo:  ## launch the Gradio demo (pip install gradio)
 	$(PYTHON) demo/app.py
