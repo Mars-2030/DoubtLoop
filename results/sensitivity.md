@@ -1,6 +1,6 @@
 # Sensitivity
 
-- generated: 2026-09-07  |  backend: `scripted`  |  model: `n/a (scripted stand-in)`
+- generated: 2026-09-08  |  backend: `scripted`  |  model: `n/a (scripted stand-in)`
 - n = 39 QA items  |  defaults in use: tau = 0.7, k = 4
 
 ## Support threshold (same generations, re-scored)

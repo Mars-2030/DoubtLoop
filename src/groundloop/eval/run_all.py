@@ -25,6 +25,7 @@ from groundloop.datasets import load_qa, load_sycophancy, read_jsonl, write_json
 from groundloop.eval import hallucination_rate as hall
 from groundloop.eval import sycophancy_probe as syco
 from groundloop.eval import critique_quality as critique_eval
+from groundloop.eval import significance
 from groundloop.eval import tool_use_quality as tools_eval
 from groundloop.llm import add_backend_args, backend_from_args
 from groundloop.loop.pipeline import CONDITIONS, run_dataset
@@ -67,6 +68,8 @@ def run(args, out_dir: Path) -> dict:
     probe = load_sycophancy(limit=args.limit)
 
     results: dict[str, dict] = {}
+    qa_scores: dict[str, list] = {}
+    probe_scores: dict[str, list] = {}
     raw_dir = out_dir / "raw"
     replay = Path(args.from_trajectories) if args.from_trajectories else None
     llm = None if replay else backend_from_args(args)
@@ -93,8 +96,10 @@ def run(args, out_dir: Path) -> dict:
                 write_jsonl(raw_dir / f"qa_{condition}.jsonl", qa_trajs)
                 write_jsonl(raw_dir / f"probe_{condition}.jsonl", probe_trajs)
 
-        _, qa_summary = hall.score_trajectories(qa_trajs, qa, tool)
-        _, probe_summary = syco.score_trajectories(probe_trajs, probe)
+        qa_scored, qa_summary = hall.score_trajectories(qa_trajs, qa, tool)
+        probe_scored, probe_summary = syco.score_trajectories(probe_trajs, probe)
+        qa_scores[condition] = qa_scored
+        probe_scores[condition] = probe_scored
         entry = {"qa": qa_summary, "sycophancy": probe_summary}
         if condition == "groundloop":
             entry["tool_use"] = tools_eval.score_trajectories(qa_trajs, qa)
@@ -103,7 +108,16 @@ def run(args, out_dir: Path) -> dict:
 
     if not replay:
         print(file=sys.stderr)
+
+    # Paired, because every condition answered the same questions in the same
+    # order. At n=39 this is what separates a result from a direction.
+    comparisons = [
+        significance.compare(qa_scores, "hallucinated", higher_is_better=False),
+        significance.compare(qa_scores, "correct", higher_is_better=True),
+        significance.compare(probe_scores, "pushback", higher_is_better=True),
+    ]
     return {
+        "significance": comparisons,
         "meta": {
             "groundloop_version": __version__,
             "date": date.today().isoformat(),
@@ -255,6 +269,8 @@ def render_markdown(payload: dict) -> str:
             "lower bound. With the scripted stand-in these are trivially 100% / 0%:",
             "its critique *is* the lexical check, so it cannot disagree with itself.",
         ]
+
+    lines += significance.render_markdown(payload.get("significance", []))
 
     lines += [
         "",

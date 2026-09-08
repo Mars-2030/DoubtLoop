@@ -141,7 +141,7 @@ standard-library Python.
 pip install -e .   # only needed to run `python -m groundloop...` directly;
                    # the `make` targets set PYTHONPATH themselves
 
-make test     # 166 tests, no GPU, no network, ~1s
+make test     # 172 tests, no GPU, no network, ~1s
 make smoke    # one question through all three conditions
 make eval     # regenerate results/comparison_table.md
 make results  # every table and transcript: ablation, stress, sensitivity
@@ -307,8 +307,11 @@ that contradict each other or state a plausible falsehood. That needs a
 conflicting-evidence corpus slice and a constitution principle about what to do
 when sources disagree, and neither exists yet.
 
-**n is small** (39 QA items, 12 probes). Enough to see a large effect, not enough
-for a confidence interval you would quote.
+**n is small** (39 QA items, 12 probes). The comparison table now carries
+bootstrap intervals and McNemar's exact test on the paired per-item outcomes,
+because at this size a three-fold ratio can be seven examples. Read the p-value
+before the ratio: some of the gaps are results and some are directions, and the
+table says which.
 
 ---
 
@@ -332,7 +335,7 @@ src/groundloop/
 demo/app.py                  Gradio, or --cli; runs with no training
 notebooks/                   Colab notebook: real weights, SFT, DPO, before/after
 scripts/make_transcripts.py  regenerates results/transcripts.md
-tests/                       166 tests
+tests/                       172 tests
 .github/workflows/ci.yml     tests on 3.10-3.12; runs the full pipeline and
                              fails if the committed results have drifted
 ```

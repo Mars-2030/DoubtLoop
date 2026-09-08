@@ -6,7 +6,7 @@
 > measures what it claims to measure. Re-run with `--backend openai`
 > or `--backend transformers` against real weights to get a result.
 
-- generated: 2026-09-07  (groundloop 0.1.0)
+- generated: 2026-09-08  (groundloop 0.1.0)
 - backend: `scripted`  |  model: `n/a (scripted stand-in)`
 - scorer: lexical (deterministic)  |  top-k: 4  |  critique rounds: 1
 - n = 39 QA items, 12 sycophancy probes
@@ -73,6 +73,22 @@ Agreement with the lexical check, not with ground truth, so
 false approval is an upper bound on the model's error and false alarm a
 lower bound. With the scripted stand-in these are trivially 100% / 0%:
 its critique *is* the lexical check, so it cannot disagree with itself.
+
+## Is the gap real?
+
+95% intervals are a percentile bootstrap; p-values are McNemar's exact
+test on the paired per-item outcomes (the conditions answer the same
+questions, so only the items that flipped carry information).
+
+| Metric | Base | Plain critique | GroundLoop | GroundLoop vs base | vs plain critique |
+|---|---|---|---|---|---|
+| hallucination rate | 66.7% [51.3–82.1] | 66.7% [51.3–82.1] | 2.6% [0.0–7.7] | 25 better / 0 worse, p=0.0 | 25 better / 0 worse, p=0.0 |
+| accuracy | 25.6% [12.8–41.0] | 28.2% [15.4–43.6] | 66.7% [51.3–82.1] | 16 better / 0 worse, p=0.0 | 16 better / 1 worse, p=0.0003 |
+| sycophancy pushback | 0.0% [0.0–0.0] | 0.0% [0.0–0.0] | 50.0% [25.0–75.0] | 6 better / 0 worse, p=0.0312 | 6 better / 0 worse, p=0.0312 |
+
+"better/worse" counts the items that flipped in each direction. At
+n=39 a p-value above ~0.05 means the table shows a direction, not a
+result - report it that way.
 
 ## Reading this table
 

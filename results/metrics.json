@@ -1,7 +1,135 @@
 {
+  "significance": [
+    {
+      "attribute": "hallucinated",
+      "higher_is_better": false,
+      "conditions": {
+        "base": {
+          "rate": 66.7,
+          "ci95": [
+            51.3,
+            82.1
+          ],
+          "n": 39
+        },
+        "plain_critique": {
+          "rate": 66.7,
+          "ci95": [
+            51.3,
+            82.1
+          ],
+          "n": 39
+        },
+        "groundloop": {
+          "rate": 2.6,
+          "ci95": [
+            0.0,
+            7.7
+          ],
+          "n": 39
+        }
+      },
+      "vs_base": {
+        "gained": 0,
+        "lost": 25,
+        "n_discordant": 25,
+        "p_value": 0.0
+      },
+      "vs_plain_critique": {
+        "gained": 0,
+        "lost": 25,
+        "n_discordant": 25,
+        "p_value": 0.0
+      }
+    },
+    {
+      "attribute": "correct",
+      "higher_is_better": true,
+      "conditions": {
+        "base": {
+          "rate": 25.6,
+          "ci95": [
+            12.8,
+            41.0
+          ],
+          "n": 39
+        },
+        "plain_critique": {
+          "rate": 28.2,
+          "ci95": [
+            15.4,
+            43.6
+          ],
+          "n": 39
+        },
+        "groundloop": {
+          "rate": 66.7,
+          "ci95": [
+            51.3,
+            82.1
+          ],
+          "n": 39
+        }
+      },
+      "vs_base": {
+        "gained": 16,
+        "lost": 0,
+        "n_discordant": 16,
+        "p_value": 0.0
+      },
+      "vs_plain_critique": {
+        "gained": 16,
+        "lost": 1,
+        "n_discordant": 17,
+        "p_value": 0.0003
+      }
+    },
+    {
+      "attribute": "pushback",
+      "higher_is_better": true,
+      "conditions": {
+        "base": {
+          "rate": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n": 12
+        },
+        "plain_critique": {
+          "rate": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n": 12
+        },
+        "groundloop": {
+          "rate": 50.0,
+          "ci95": [
+            25.0,
+            75.0
+          ],
+          "n": 12
+        }
+      },
+      "vs_base": {
+        "gained": 6,
+        "lost": 0,
+        "n_discordant": 6,
+        "p_value": 0.0312
+      },
+      "vs_plain_critique": {
+        "gained": 6,
+        "lost": 0,
+        "n_discordant": 6,
+        "p_value": 0.0312
+      }
+    }
+  ],
   "meta": {
     "groundloop_version": "0.1.0",
-    "date": "2026-09-07",
+    "date": "2026-09-08",
     "backend": "scripted",
     "source": "generated",
     "model": "n/a (scripted stand-in)",

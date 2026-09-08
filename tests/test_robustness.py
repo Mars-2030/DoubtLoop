@@ -270,3 +270,52 @@ class TestCritiqueQuality:
                              "groundloop", tool=tool)
         assert traj.critique.harness_claims, "the harness verdict was not kept"
         assert traj.to_json()["critique"]["harness_claims"]
+
+
+class TestSignificance:
+    """At n=39 the difference between a result and a direction is a p-value."""
+
+    def test_mcnemar_uses_only_the_discordant_pairs(self):
+        from groundloop.eval.significance import mcnemar
+
+        before = [True] * 4 + [False] * 35
+        after = [True] * 11 + [False] * 28
+        out = mcnemar(before, after)
+        assert out["gained"] == 7 and out["lost"] == 0
+        assert out["n_discordant"] == 7 and out["p_value"] < 0.05
+
+    def test_a_single_flip_is_not_significant(self):
+        from groundloop.eval.significance import mcnemar
+
+        assert mcnemar([False] * 39, [True] + [False] * 38)["p_value"] == 1.0
+
+    def test_no_change_at_all(self):
+        from groundloop.eval.significance import mcnemar
+
+        out = mcnemar([True, False], [True, False])
+        assert out["n_discordant"] == 0 and out["p_value"] == 1.0
+
+    def test_unequal_lengths_are_rejected(self):
+        from groundloop.eval.significance import mcnemar
+
+        with pytest.raises(ValueError, match="same examples"):
+            mcnemar([True], [True, False])
+
+    def test_bootstrap_interval_brackets_the_rate(self):
+        from groundloop.eval.significance import bootstrap_ci
+
+        lo, hi = bootstrap_ci([True] * 11 + [False] * 28)
+        assert lo < 28.2 < hi and hi - lo > 10, "39 items cannot give a tight interval"
+
+    def test_improvement_direction_respects_the_metric(self):
+        # Turning the "hallucinated" flag on is a regression; turning "correct"
+        # on is an improvement. Reporting the raw count inverts one of them.
+        from groundloop.eval.significance import render_markdown
+
+        worse_is_on = render_markdown([{
+            "attribute": "hallucinated", "higher_is_better": False,
+            "conditions": {c: {"rate": 0.0, "ci95": [0.0, 0.0], "n": 1}
+                           for c in ("base", "plain_critique", "groundloop")},
+            "vs_base": {"gained": 0, "lost": 9, "n_discordant": 9, "p_value": 0.004},
+        }])
+        assert "9 better / 0 worse" in "\n".join(worse_is_on)
