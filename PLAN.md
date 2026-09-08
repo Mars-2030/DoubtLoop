@@ -78,7 +78,20 @@ Nothing in the code is Qwen-specific beyond one `apply_chat_template` call.
     `rejected`, both answering one prompt that already contains the evidence —
     otherwise DPO learns "prefer the text with brackets in it".
 
-## Phase 5 — Fine-tuning · *partial (written, dry-run tested, not trained)*
+## Phase 5 — Fine-tuning · *not run (written, dry-run tested, never trained)*
+
+**Everything above Phase 5 is inference-time.** The three conditions are
+prompting strategies over frozen weights; nothing in the measured result
+involves a parameter update. That is worth stating plainly because the project
+description says "aligned", and alignment implies training. What exists is a
+method plus the harness that measures it.
+
+The blocker is now measured rather than assumed: on real weights the loop yields
+~17% usable self-revisions, about nine records from 51 examples. The default SFT
+style is also the wrong target for the observed failure - `distilled` teaches
+question -> tool call -> answer, and the model already does both perfectly; the
+critique turn, where false approval runs at 53%, only appears in
+`--style trajectory`.
 
 12. *partial* — `train/sft.py`: TRL `SFTTrainer` + LoRA, defaults sized for a
     single consumer GPU / free-tier T4. `--dry-run` validates data and config

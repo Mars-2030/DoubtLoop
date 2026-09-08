@@ -349,10 +349,30 @@ code is Qwen-specific beyond the chat template call — `--model` takes anything
 your backend serves. Gemma 3 270M is the interesting ablation (does the technique
 survive at 270M?); Qwen3.5-2B is the headroom option.
 
-## Status
+## Status: what has and has not been tested
 
-Phases 1–4, 6, and 7 of [`PLAN.md`](PLAN.md) are implemented and running, plus
-the robustness work that was listed as next. Phase 5 (SFT + DPO) is written and
-dry-run tested but has not been run against real weights in this environment —
-no GPU. The headline table is a harness demonstration until someone runs
-`make eval-model`.
+**Tested, on real weights (Qwen3-0.6B).** The three conditions are *inference-time
+scaffolding* over frozen weights — no parameters are changed by any of them. One
+model call for the base condition, three for plain self-critique, five plus a
+retrieval call for GroundLoop. The ablation, the retrieval stress modes, the
+sensitivity sweeps and the critique-quality measurement all ran end to end, and
+Phase 4 produced real trajectories and preference pairs.
+
+So the result answers one question: **does wrapping a small model in a
+retrieval-grounded critique loop make it more honest at inference time?** On this
+corpus, yes — accuracy roughly triples and the gain is significant under a paired
+test — with the critique step as the binding constraint.
+
+**Not tested: whether the behaviour can be put into the weights.** Phase 5 (LoRA
+SFT, then DPO) is written and dry-run tested but has never trained against real
+weights. That step is what would turn a *method* into an *aligned model* — one
+that drafts a grounded answer in a single call, without five calls and a
+retriever holding it up. Until it runs, this repository contains an
+inference-time method and the harness that measures it, and the "aligned" in the
+project description is an aim rather than a claim.
+
+The reason Phase 5 has not run is now measured rather than assumed: at 17% yield
+the model produces roughly nine usable self-revisions from 51 examples, which is
+memorisation rather than training. Generating that data with a larger model would
+clear the volume problem and make it distillation rather than self-improvement —
+a different claim, and one the write-up would have to state.
